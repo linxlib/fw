@@ -2,15 +2,6 @@ package fw
 
 import "github.com/linxlib/fw/attribute"
 
-/// TODO:
-/// 中间件需要可以从注释的位置传参进来
-/// 例如： @Logger color=false&params=body1,path1
-/// @BasicAuth user=admin&pass=admin
-/// 参数可以采用query的形式传入（暂时），或者其他方式
-
-/// 中间件需要由系统注入一些常用的服务，例如数据库之类的，这个不方便在参数处传入
-/// 当然如果inject可以根据名称去注入的话
-
 type AttributeName = string
 type SlotType = string
 
@@ -91,9 +82,9 @@ type Middleware struct {
 func (m *Middleware) doReg() {
 	switch m.slot {
 	case SlotMethod:
-		AddMethodAttributeType(m.attr, attribute.TypeMiddleware)
+		attribute.AddMethodAttributeType(m.attr, attribute.TypeMiddleware)
 	case SlotController:
-		AddCtlAttributeType(m.attr, attribute.TypeMiddleware)
+		attribute.AddStructAttributeType(m.attr, attribute.TypeMiddleware)
 	case SlotGlobal:
 
 	default:

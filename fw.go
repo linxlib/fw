@@ -13,6 +13,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"os"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -36,11 +37,15 @@ func New(f ...func(*Option)) *Server {
 	if os.Getenv("FW_DEBUG") == "true" {
 		s.isDev = true
 	}
+	if os.Getenv("FW_NOCOLOR") == "true" {
+		s.nocolor = true
+	}
 	s.Map(s.option.y)
 	s.Map(s)
 	s.parser.Load()
 	s.tw = tablewriter.NewWriter(os.Stdout)
 	s.tw.SetHeader([]string{"Controller", "Method", "Route", "Method", "Signature"})
+
 	s.tw.SetRowLine(true)
 	s.tw.SetCenterSeparator("|")
 	writeConfig(s.option)
@@ -59,6 +64,7 @@ type Server struct {
 	once       sync.Once
 	midGlobals []IMiddlewareMethod
 	isDev      bool
+	nocolor    bool
 }
 
 type HandlerFunc = func(*Context)
@@ -74,7 +80,7 @@ func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 		if s.option.Server.ShowRequestTimeHeader {
 			c.ctx.Response.Header.Set("Request-Time", time.Since(start).String())
 		}
-		fmt.Printf("call spend: %s\n", time.Since(start).String())
+		//fmt.Printf("call spend: %s\n", time.Since(start).String())
 	}
 }
 
@@ -96,12 +102,16 @@ func (s *Server) handleStatic() {
 }
 
 func (s *Server) add(a, b, c, d, e string) {
-	s.tw.Append([]string{a, b, c, d, e})
-}
-
-// TODO: 直接注册一个function
-func (s *Server) RegisterFunc(f any) error {
-	return nil
+	if s.nocolor {
+		s.tw.Append([]string{a, b, c, d, e})
+	} else {
+		s.tw.Rich([]string{a, b, c, d, e}, []tablewriter.Colors{
+			tablewriter.Color(tablewriter.FgBlueColor),
+			tablewriter.Color(tablewriter.FgGreenColor),
+			tablewriter.Color(tablewriter.FgHiWhiteColor),
+			tablewriter.Color(tablewriter.FgHiGreenColor),
+			tablewriter.Color(tablewriter.FgHiYellowColor)})
+	}
 }
 
 func (s *Server) RegisterRoutes(controller ...any) {
@@ -110,7 +120,7 @@ func (s *Server) RegisterRoutes(controller ...any) {
 	}
 }
 
-func (s *Server) RegisterRoute(controller any) error {
+func (s *Server) RegisterRoute(controller any) {
 	//假定astp已经解析好了整个项目，并通过某种方式还原了Parser内部的值
 	// 这里需要通过传入的controller指针 并通过反射方式获取到 controller method param result各种的反射值，并填充到已有的Parser里
 	// 这里的指针 通过代码生成的方式
@@ -210,9 +220,6 @@ func (s *Server) RegisterRoute(controller any) error {
 		}
 		return false
 	})
-
-	return nil
-
 }
 
 func (s *Server) registerRoute(httpmethod string, relativePath string, call HandlerFunc) error {
@@ -337,13 +344,6 @@ func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod) ([]strin
 	return attrs1, next
 }
 
-func AddCtlAttributeType(name string, t attribute.AttributeType) {
-	attribute.AddStructAttributeType(name, t)
-}
-func AddMethodAttributeType(name string, typ attribute.AttributeType) {
-	attribute.AddMethodAttributeType(name, typ)
-}
-
 func (s *Server) handleError(ctx *Context, err error) {
 
 }
@@ -352,10 +352,18 @@ func (s *Server) Run() error {
 	s.handleStatic()
 	s.tw.Render()
 
-	internal.Infof("fw server running http://%s:%d%s\n", s.option.Server.Listen, s.option.Server.Port, s.option.Server.BasePath)
+	internal.OKf("fw server@%s serving at http://%s:%d%s", Version, s.option.Server.Listen, s.option.Server.Port, s.option.Server.BasePath)
 	s.server.Handler = s.router.Handler
 	s.server.StreamRequestBody = true
 	s.server.Name = "fw"
+	if s.isDev {
+		if runtime.GOOS == "darwin" {
+			internal.Note("press ⌘+C to exit...")
+		} else {
+			internal.Note("press CTRL+C to exit...")
+		}
+	}
+
 	return s.server.ListenAndServe(fmt.Sprintf("%s:%d", s.option.Server.Listen, s.option.Server.Port))
 }
 

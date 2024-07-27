@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"fmt"
 	"github.com/linxlib/fw"
 	"github.com/linxlib/fw/types"
 	"net/url"
@@ -99,13 +100,29 @@ func (w *LogMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
 			params.ErrorMessage = "Err:" + err.(error).Error()
 		}
 
-		w.logger.Infof("|%3d| %13v | %15s | %-7s %#v\n%s",
+		w.logger.Infof("|%3d| %13v | %15s | %-7s %#v %s\n%s",
 			params.StatusCode,
 			params.Latency.String(),
 			params.ClientIP,
 			params.Method,
 			params.Path,
+			byteCountSI(int64(params.BodySize)),
 			params.ErrorMessage,
 		)
 	}
+}
+
+// ByteCountSI 字节数转带单位
+func byteCountSI(b int64) string {
+	const unit = 1000
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB",
+		float64(b)/float64(div), "kMGTPE"[exp])
 }

@@ -1,7 +1,6 @@
 package fw
 
 import (
-	"fmt"
 	"github.com/linxlib/config"
 	"github.com/linxlib/fw/internal"
 	"gopkg.in/yaml.v2"
@@ -25,7 +24,6 @@ type ServerOption struct {
 	BasePath              string      `yaml:"basePath"`
 	Listen                string      `yaml:"listen"` //监听地址
 	Name                  string      `yaml:"name"`   //server_token
-	EnableGzip            bool        `yaml:"enable_gzip"`
 	ShowRequestTimeHeader bool        `yaml:"showRequestTimeHeader"`
 	Key                   string      `yaml:"key"`  //ssl key
 	Cert                  string      `yaml:"cert"` //ssl cert
@@ -36,7 +34,6 @@ type ServerOption struct {
 var _defaultServerOption = ServerOption{
 	BasePath:              "",
 	Listen:                "0.0.0.0",
-	EnableGzip:            true,
 	Port:                  time.Now().Year(),
 	ShowRequestTimeHeader: true,
 	StaticDirs: []StaticDir{
@@ -89,19 +86,4 @@ func defaultOption() *Option {
 		intranetIP: getIntranetIP(),
 	}
 	return readConfig(o)
-}
-
-// ByteCountSI 字节数转带单位
-func byteCountSI(b int64) string {
-	const unit = 1000
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := int64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB",
-		float64(b)/float64(div), "kMGTPE"[exp])
 }

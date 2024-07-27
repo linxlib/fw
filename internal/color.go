@@ -10,26 +10,38 @@ var (
 	white        = color.HiWhite.Render
 	red          = color.HiRed.Render
 	green        = color.HiGreen.Render
+	blue         = color.HiBlue.Render
+	cyan         = color.HiCyan.Render
+	gray         = color.Gray.Render
 	yellow       = color.HiYellow.Render
 	magenta      = color.HiMagenta.Render
 	lightmagenta = color.LightMagenta.Render
+	info         = color.Info.Render
+	note         = color.Note.Render
+	err          = color.Error.Render
+	danger       = color.Danger.Render
+	success      = color.Success.Render
+	warning      = color.Warn.Render
+	question     = color.Question.Render
+	primary      = color.Primary.Render
+	secondary    = color.Secondary.Render
 
-	fwFormat = "[%s] %s "
-	tinfo    = "I"
-	twarn    = "W"
-	tdebug   = "D"
-	terr     = "E"
-	tfatal   = "F"
+	fwFormat = "%s %s "
+	tinfo    = "INFO"
+	twarn    = "WARNING"
+	tdebug   = "DEBUG"
+	terr     = "ERROR"
+	tfatal   = "FATAL"
 	tok      = "√"
-	tfail    = "x"
-	tnone    = ""
+	tfail    = "×"
+	tnone    = "SPAM"
 )
 
 func format(tag string) string {
 	if tag == "" {
-		return time.Now().Format("01-02 15:04:05")
+		return time.Now().Format("2006-01-02 15:04:05")
 	}
-	return fmt.Sprintf(fwFormat, tag, time.Now().Format("01-02 15:04:05"))
+	return fmt.Sprintf(fwFormat, white(time.Now().Format("2006-01-02 15:04:05")), gray(tag))
 }
 
 func Infof(fmt string, args ...any) {
@@ -37,6 +49,9 @@ func Infof(fmt string, args ...any) {
 }
 func Info(args ...any) {
 	color.Print(format(tinfo), white(args...)+"\n")
+}
+func Note(args ...any) {
+	color.Print(white(args...) + "\n")
 }
 
 func Whitef(fmt string, args ...any) {
