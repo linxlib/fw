@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/fasthttp/websocket"
 	"github.com/linxlib/fw"
-	"github.com/linxlib/fw/attribute"
 	"log"
 )
 
@@ -12,10 +11,6 @@ var _ fw.IMiddlewareMethod = (*WebsocketMiddleware)(nil)
 
 const websocketAttr = "Websocket"
 const websocketName = "Websocket"
-
-func init() {
-	fw.AddMethodAttributeType(websocketAttr, attribute.TypeMiddleware)
-}
 
 func NewWebsocketMiddleware() fw.IMiddlewareMethod {
 	mw := &WebsocketMiddleware{
@@ -26,6 +21,7 @@ func NewWebsocketMiddleware() fw.IMiddlewareMethod {
 	return mw
 }
 
+// WebsocketMiddleware used for simple websocket communication with server
 type WebsocketMiddleware struct {
 	fw.MiddlewareMethod
 	upgrade websocket.FastHTTPUpgrader

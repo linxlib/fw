@@ -33,7 +33,9 @@ func New(f ...func(*Option)) *Server {
 	if len(f) > 0 {
 		f[0](s.option)
 	}
-
+	if os.Getenv("FW_DEBUG") == "true" {
+		s.isDev = true
+	}
 	s.Map(s.option.y)
 	s.Map(s)
 	s.parser.Load()
@@ -56,6 +58,7 @@ type Server struct {
 	logger     types.ILogger
 	once       sync.Once
 	midGlobals []IMiddlewareMethod
+	isDev      bool
 }
 
 type HandlerFunc = func(*Context)
@@ -63,6 +66,7 @@ type HandlerFunc = func(*Context)
 // wrap the HandlerFunc to fasthttp.RequestHandler
 // just create *Context
 func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
+
 	return func(ctx *fasthttp.RequestCtx) {
 		start := time.Now()
 		c := newContext(ctx, s)
@@ -120,11 +124,17 @@ func (s *Server) RegisterRoute(controller any) error {
 
 	s.once.Do(func() {
 		s.midGlobals = make([]IMiddlewareMethod, 0)
-		m0 := s.handleGlobal()
+		m0 := s.handleGlobal(s.option.Server.BasePath)
 		for _, item := range m0 {
 			s.midGlobals = append(s.midGlobals, item.Middleware)
-			s.registerRoute(item.Method, item.Path, item.H)
-			s.add("Server", item.Method, item.Path, "Global", "Global Middleware")
+			if item.Path != "" {
+				s.registerRoute(item.Method, item.Path, item.H)
+				if !item.IsHide {
+					s.add("Server", item.Method, item.Path, "Global", "@"+item.Middleware.Name())
+				}
+
+			}
+
 			//if !item.IsHide {
 			//
 			//}
@@ -150,9 +160,11 @@ func (s *Server) RegisterRoute(controller any) error {
 
 		for _, item := range m {
 			mids = append(mids, item.Middleware)
-			s.registerRoute(item.Method, item.Path, item.H)
-			if !item.IsHide {
-				s.add(ctl.Name, item.Method, item.Path, ctl.Name, "Controller Middleware")
+			if item.Path != "" {
+				s.registerRoute(item.Method, item.Path, item.H)
+				if !item.IsHide {
+					s.add(ctl.Name, item.Method, item.Path, ctl.Name, "@"+item.Middleware.Name())
+				}
 			}
 
 		}
@@ -168,22 +180,32 @@ func (s *Server) RegisterRoute(controller any) error {
 			}
 			method.SetMethod(vm.Interface())
 
-			var hm, rp string
+			var hms = make([]string, 0)
+			var rps = make([]string, 0)
 			for _, command := range attribute.GetMethodAttributes(method) {
 				if command.Type == attribute.TypeHttpMethod {
-					hm = command.Name
-					rp = command.Value
+					hms = append(hms, command.Name)
+					rps = append(rps, command.Value)
 				}
 			}
-			call1 := s.handle(method, mids)
+			attrs, call1 := s.handle(method, mids)
+			sig := []string{}
+			for _, mid := range mids {
+				sig = append(sig, "@"+mid.Attribute())
+			}
+			for _, attr := range attrs {
+				sig = append(sig, "@"+attr)
+			}
 
 			//TODO: base 和 rp拼接时需要注意下 “/”
-			err := s.registerRoute(strings.ToUpper(hm), base+rp, call1)
-			if err != nil {
-				s.handleError(nil, err)
-				continue
+			for i, hm := range hms {
+				err := s.registerRoute(strings.ToUpper(hm), base+rps[i], call1)
+				if err != nil {
+					s.handleError(nil, err)
+					continue
+				}
+				s.add(method.Receiver.TypeString, strings.ToUpper(hm), base+rps[i], method.Name, strings.Join(sig, ","))
 			}
-			s.add(method.Receiver.TypeString, strings.ToUpper(hm), base+rp, method.Name, method.Signature)
 
 		}
 		return false
@@ -195,6 +217,7 @@ func (s *Server) RegisterRoute(controller any) error {
 
 func (s *Server) registerRoute(httpmethod string, relativePath string, call HandlerFunc) error {
 	call1 := s.wrap(call)
+
 	switch httpmethod {
 	case "POST":
 		s.router.POST(relativePath, call1)
@@ -255,11 +278,15 @@ func (s *Server) wrapM(handler *astp.Method) HandlerFunc {
 	}
 }
 
-func (s *Server) handleGlobal() []*RouteItem {
+func (s *Server) handleGlobal(base string) []*RouteItem {
 	result := make([]*RouteItem, 0)
 	s.middleware.GetGlobal(func(mid IMiddlewareGlobal) bool {
 		mid = mid.CloneAsCtl()
-		result = append(result, mid.HandlerController(""))
+		r := mid.HandlerController(base)
+		if r != nil {
+			result = append(result, r)
+		}
+
 		return false
 	})
 	return result
@@ -273,21 +300,26 @@ func (s *Server) handleCtl(base string, ctl *astp.Struct) []*RouteItem {
 			// 拷贝一份 表示这份实例唯此控制器独享
 			mid = mid.CloneAsCtl()
 			mid.SetParam(attr.Value)
-			result = append(result, mid.HandlerController(base))
+			r := mid.HandlerController(base)
+			if r != nil {
+				result = append(result, r)
+			}
 
 		}
 	}
 	return result
 }
 
-func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod) HandlerFunc {
+func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod) ([]string, HandlerFunc) {
 	//log.Println("handle called")
 	//先把实际的方法wrap成HandlerFunc
 	next := s.wrapM(handler)
 	// 先处理method上的中间件
 	attrs := attribute.GetMethodAttributesAsMiddleware(handler)
+	attrs1 := []string{}
 	for _, attr := range attrs {
 		if mid, ok := s.middleware.GetByAttributeMethod(attr.Name); ok {
+			attrs1 = append(attrs1, mid.Attribute())
 			// 拷贝一份副本 让中间件对于此上下文唯一
 			mid = mid.CloneAsMethod()
 			mid.SetParam(attr.Value)
@@ -302,7 +334,7 @@ func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod) HandlerF
 	for _, global := range s.midGlobals {
 		next = global.HandlerMethod(next)
 	}
-	return next
+	return attrs1, next
 }
 
 func AddCtlAttributeType(name string, t attribute.AttributeType) {

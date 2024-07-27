@@ -23,10 +23,11 @@ framework 简称
 - [ ] 日志类
 - [x] 配置写出
 - [ ] Swagger
+- [ ] pprof middleware
+- [ ] WebLogMiddleware
 - [x] ServerDownMiddleware 作为全局中间件
 - [ ] ResponseRewriter 作为全局或ctl中间件
 - [ ] CorsMiddleware 全局中间件
-- [ ] AuthMiddleware 全局或ctl或method
 - [ ] Crud 中间件
 - [ ] 数据库或者服务的注入
 - [ ] 运行为 系统服务 
@@ -34,3 +35,4 @@ framework 简称
 - [ ] 检测代码自动重启功能
 - [ ] Grpc
 - [ ] 泛型支持
+- [ ] AuthMiddleware 全局或ctl或method

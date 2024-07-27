@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// ServerDownMiddleware is a middleware which provides an api to mark server down.
 type ServerDownMiddleware struct {
 	fw.MiddlewareGlobal
 	key        string
@@ -53,7 +54,7 @@ func (s *ServerDownMiddleware) HandlerController(s2 string) *fw.RouteItem {
 
 const serverDownName = "ServerDown"
 
-func NewServerDownMiddleware(key string) fw.IMiddlewareCtl {
+func NewServerDownMiddleware(key string) fw.IMiddlewareGlobal {
 
 	return &ServerDownMiddleware{
 		key:              key,

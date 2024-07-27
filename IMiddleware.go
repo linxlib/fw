@@ -1,5 +1,7 @@
 package fw
 
+import "github.com/linxlib/fw/attribute"
+
 /// TODO:
 /// 中间件需要可以从注释的位置传参进来
 /// 例如： @Logger color=false&params=body1,path1
@@ -23,6 +25,7 @@ type IMiddleware interface {
 	GetSlot() SlotType
 	SetParam(string)
 	GetParam() string
+	doReg()
 }
 type IMiddlewareMethod interface {
 	IMiddleware
@@ -83,6 +86,19 @@ type Middleware struct {
 	name  string
 	attr  string
 	param string
+}
+
+func (m *Middleware) doReg() {
+	switch m.slot {
+	case SlotMethod:
+		AddMethodAttributeType(m.attr, attribute.TypeMiddleware)
+	case SlotController:
+		AddCtlAttributeType(m.attr, attribute.TypeMiddleware)
+	case SlotGlobal:
+
+	default:
+
+	}
 }
 
 func (m *Middleware) GetParam() string {

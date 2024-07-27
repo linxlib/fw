@@ -18,10 +18,11 @@ func NewMiddlewareContainer() *MiddlewareContainer {
 
 // Reg will store middleware to specified map according to its slot
 func (m *MiddlewareContainer) Reg(middleware IMiddleware) {
+	middleware.doReg()
 	st := middleware.GetSlot()
 	switch st {
 	case SlotGlobal:
-		m.ms[st][middleware.Attribute()] = middleware
+		m.ms[st][middleware.Name()] = middleware
 	case SlotController:
 		m.ms[st][middleware.Attribute()] = middleware
 	case SlotMethod:

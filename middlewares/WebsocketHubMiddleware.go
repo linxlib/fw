@@ -5,7 +5,6 @@ import (
 	"github.com/fasthttp/websocket"
 	"github.com/linxlib/conv"
 	"github.com/linxlib/fw"
-	"github.com/linxlib/fw/attribute"
 	"github.com/valyala/fasthttp"
 	"log"
 	"math/rand/v2"
@@ -16,10 +15,6 @@ var _ fw.IMiddlewareCtl = (*WebsocketHubMiddleware)(nil)
 
 const websocketHubAttr = "WebsocketHub"
 const websocketHubName = "WebsocketHub"
-
-func init() {
-	fw.AddCtlAttributeType(websocketHubAttr, attribute.TypeMiddleware)
-}
 
 func NewWebsocketHubMiddleware() fw.IMiddlewareCtl {
 	mw := &WebsocketHubMiddleware{
@@ -35,6 +30,8 @@ func NewWebsocketHubMiddleware() fw.IMiddlewareCtl {
 	return mw
 }
 
+// WebsocketHubMiddleware
+// used for chat
 type WebsocketHubMiddleware struct {
 	fw.MiddlewareCtl
 	upgrade websocket.FastHTTPUpgrader
