@@ -1,6 +1,7 @@
 package fw
 
 import (
+	"bufio"
 	"errors"
 	"github.com/linxlib/conv"
 	"github.com/linxlib/fw/render"
@@ -251,6 +252,16 @@ func (c *Context) DataFromReader(code int, contentLength int64, contentType stri
 }
 func (c *Context) File(filepath string) {
 	c.ctx.SendFile(filepath)
+}
+
+func (c *Context) HTML(code int, name string, obj any) {
+
+}
+
+// Stream sends a streaming response and returns a boolean
+// indicates "Is client disconnected in middle of stream"
+func (c *Context) Stream(step func(w *bufio.Writer)) {
+	c.ctx.SetBodyStreamWriter(step)
 }
 
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")

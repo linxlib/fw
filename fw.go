@@ -109,6 +109,9 @@ func (s *Server) RegisterRoutes(controller ...any) {
 	}
 }
 
+const controllerAttr = "Controller"
+const controllerRoute = "Route"
+
 func (s *Server) RegisterRoute(controller any) {
 	//假定astp已经解析好了整个项目，并通过某种方式还原了Parser内部的值
 	// 这里需要通过传入的controller指针 并通过反射方式获取到 controller method param result各种的反射值，并填充到已有的Parser里
@@ -133,23 +136,20 @@ func (s *Server) RegisterRoute(controller any) {
 				}
 
 			}
-
-			//if !item.IsHide {
-			//
-			//}
-
 		}
 	})
 
 	// 遍历代码中所有的 @Controller 标记的结构，按照控制器对待
 	s.parser.VisitAllStructs(typ.Name(), func(ctl *astp.Struct) bool {
-		if !attribute.HasAttribute(ctl, "Controller") {
+
+		if !attribute.HasAttribute(ctl, controllerAttr) {
 			return false
 		}
 		// 第一层路由 【配置文件】
 		base := s.option.BasePath
 		// 第二层路由 @Route 标记
-		if r := attribute.GetStructAttrByName(ctl, "Route"); r != nil {
+
+		if r := attribute.GetStructAttrByName(ctl, controllerRoute); r != nil {
 			base += r.Value
 		}
 
@@ -268,7 +268,6 @@ func (s *Server) bind(c *Context, handler *astp.Method) {
 
 func (s *Server) wrapM(handler *astp.Method) HandlerFunc {
 	return func(context *Context) {
-		//log.Println("wrapM called")
 		s.bind(context, handler)
 		_, _ = context.Injector().Invoke(handler.GetMethod())
 	}
@@ -307,7 +306,6 @@ func (s *Server) handleCtl(base string, ctl *astp.Struct) []*RouteItem {
 }
 
 func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod) ([]string, HandlerFunc) {
-	//log.Println("handle called")
 	//先把实际的方法wrap成HandlerFunc
 	next := s.wrapM(handler)
 	// 先处理method上的中间件
