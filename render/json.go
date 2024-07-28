@@ -3,7 +3,7 @@ package render
 import (
 	"bytes"
 	"fmt"
-	"github.com/linxlib/fw/internal/bytesconv"
+	"github.com/linxlib/conv"
 	"github.com/linxlib/fw/internal/json"
 	"github.com/valyala/fasthttp"
 	"html/template"
@@ -76,9 +76,9 @@ func (r SecureJSON) Render(w *fasthttp.RequestCtx) error {
 		return err
 	}
 	// if the jsonBytes is array values
-	if bytes.HasPrefix(jsonBytes, bytesconv.StringToBytes("[")) && bytes.HasSuffix(jsonBytes,
-		bytesconv.StringToBytes("]")) {
-		if _, err = w.Write(bytesconv.StringToBytes(r.Prefix)); err != nil {
+	if bytes.HasPrefix(jsonBytes, conv.Bytes("[")) && bytes.HasSuffix(jsonBytes,
+		conv.Bytes("]")) {
+		if _, err = w.Write(conv.Bytes(r.Prefix)); err != nil {
 			return err
 		}
 	}
@@ -101,11 +101,11 @@ func (r JsonpJSON) Render(w *fasthttp.RequestCtx) (err error) {
 	}
 
 	callback := template.JSEscapeString(r.Callback)
-	if _, err = w.Write(bytesconv.StringToBytes(callback)); err != nil {
+	if _, err = w.Write(conv.Bytes(callback)); err != nil {
 		return err
 	}
 
-	if _, err = w.Write(bytesconv.StringToBytes("(")); err != nil {
+	if _, err = w.Write(conv.Bytes("(")); err != nil {
 		return err
 	}
 
@@ -113,7 +113,7 @@ func (r JsonpJSON) Render(w *fasthttp.RequestCtx) (err error) {
 		return err
 	}
 
-	if _, err = w.Write(bytesconv.StringToBytes(");")); err != nil {
+	if _, err = w.Write(conv.Bytes(");")); err != nil {
 		return err
 	}
 
@@ -130,7 +130,7 @@ func (r AsciiJSON) Render(w *fasthttp.RequestCtx) (err error) {
 	}
 
 	var buffer bytes.Buffer
-	for _, r := range bytesconv.BytesToString(ret) {
+	for _, r := range conv.String(ret) {
 		cvt := string(r)
 		if r >= 128 {
 			cvt = fmt.Sprintf("\\u%04x", int64(r))

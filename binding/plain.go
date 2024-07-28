@@ -2,7 +2,7 @@ package binding
 
 import (
 	"fmt"
-	"github.com/linxlib/fw/internal/bytesconv"
+	"github.com/linxlib/conv"
 	"github.com/valyala/fasthttp"
 	"reflect"
 )
@@ -36,7 +36,7 @@ func decodePlain(data []byte, obj any) error {
 	}
 
 	if v.Kind() == reflect.String {
-		v.SetString(bytesconv.BytesToString(data))
+		v.SetString(conv.String(data))
 		return nil
 	}
 

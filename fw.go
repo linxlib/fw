@@ -7,6 +7,8 @@ import (
 	"github.com/linxlib/fw/attribute"
 	"github.com/linxlib/fw/binding"
 	"github.com/linxlib/fw/internal"
+	"github.com/linxlib/fw/internal/json"
+	"github.com/linxlib/fw/options"
 	"github.com/linxlib/fw/types"
 	"github.com/linxlib/inject"
 	"github.com/olekukonko/tablewriter"
@@ -21,34 +23,40 @@ import (
 
 const Version = "1.0.0-beta"
 
-func New(f ...func(*Option)) *Server {
+func New() *Server {
 	s := &Server{
 		Injector:   inject.New(),
 		router:     router.New(),
 		server:     &fasthttp.Server{},
-		option:     defaultOption(),
-		parser:     astp.NewParser(), //0 非运行时 1 运行时
+		option:     new(options.ServerOption),
+		parser:     astp.NewParser(),
 		middleware: NewMiddlewareContainer(),
 		logger:     &Logger{},
 	}
-	if len(f) > 0 {
-		f[0](s.option)
+	options.ReadConfig(s.option)
+	if s.option.Debug {
+		bs, _ := json.MarshalIndent(s.option, "", "    ")
+		fmt.Println(string(bs))
 	}
-	if os.Getenv("FW_DEBUG") == "true" {
-		s.isDev = true
-	}
-	if os.Getenv("FW_NOCOLOR") == "true" {
-		s.nocolor = true
-	}
-	s.Map(s.option.y)
+
+	s.Map(s.option)
 	s.Map(s)
-	s.parser.Load()
+	if !internal.FileIsExist(s.option.AstFile) {
+		if s.option.Dev {
+			parser := astp.NewParser()
+			parser.Parse()
+			_ = parser.WriteOut(s.option.AstFile)
+		} else {
+			panic(fmt.Sprintf("%s not found, please generate it first!", s.option.AstFile))
+		}
+	}
+
+	s.parser.Load(s.option.AstFile)
 	s.tw = tablewriter.NewWriter(os.Stdout)
 	s.tw.SetHeader([]string{"Controller", "Method", "Route", "Method", "Signature"})
 
 	s.tw.SetRowLine(true)
 	s.tw.SetCenterSeparator("|")
-	writeConfig(s.option)
 	return s
 }
 
@@ -56,15 +64,13 @@ type Server struct {
 	inject.Injector
 	server     *fasthttp.Server
 	router     *router.Router
-	option     *Option
+	option     *options.ServerOption
 	parser     *astp.Parser
 	tw         *tablewriter.Table
 	middleware *MiddlewareContainer
 	logger     types.ILogger
 	once       sync.Once
 	midGlobals []IMiddlewareMethod
-	isDev      bool
-	nocolor    bool
 }
 
 type HandlerFunc = func(*Context)
@@ -77,32 +83,15 @@ func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 		start := time.Now()
 		c := newContext(ctx, s)
 		h(c)
-		if s.option.Server.ShowRequestTimeHeader {
-			c.ctx.Response.Header.Set("Request-Time", time.Since(start).String())
+		if s.option.ShowRequestTimeHeader {
+			c.ctx.Response.Header.Set(s.option.RequestTimeHeader, time.Since(start).String())
 		}
 		//fmt.Printf("call spend: %s\n", time.Since(start).String())
 	}
 }
 
-func (s *Server) handleStatic() {
-	if len(s.option.Server.StaticDirs) > 0 {
-		for _, sd := range s.option.Server.StaticDirs {
-			var path string
-			if strings.HasPrefix(sd.Path, "/") {
-				path = sd.Path + "/{filepath:*}"
-			} else {
-				path = "/" + sd.Path + "/{filepath:*}"
-			}
-			s.router.ServeFiles(path, sd.Root)
-
-			s.add("Server", "GET", path, sd.Root, "Files")
-		}
-
-	}
-}
-
-func (s *Server) add(a, b, c, d, e string) {
-	if s.nocolor {
+func (s *Server) addRouteTable(a, b, c, d, e string) {
+	if s.option.NoColor {
 		s.tw.Append([]string{a, b, c, d, e})
 	} else {
 		s.tw.Rich([]string{a, b, c, d, e}, []tablewriter.Colors{
@@ -134,13 +123,13 @@ func (s *Server) RegisterRoute(controller any) {
 
 	s.once.Do(func() {
 		s.midGlobals = make([]IMiddlewareMethod, 0)
-		m0 := s.handleGlobal(s.option.Server.BasePath)
+		m0 := s.handleGlobal(s.option.BasePath)
 		for _, item := range m0 {
 			s.midGlobals = append(s.midGlobals, item.Middleware)
 			if item.Path != "" {
 				s.registerRoute(item.Method, item.Path, item.H)
 				if !item.IsHide {
-					s.add("Server", item.Method, item.Path, "Global", "@"+item.Middleware.Name())
+					s.addRouteTable("Server", item.Method, item.Path, "Global", "@"+item.Middleware.Name())
 				}
 
 			}
@@ -158,7 +147,7 @@ func (s *Server) RegisterRoute(controller any) {
 			return false
 		}
 		// 第一层路由 【配置文件】
-		base := s.option.Server.BasePath
+		base := s.option.BasePath
 		// 第二层路由 @Route 标记
 		if r := attribute.GetStructAttrByName(ctl, "Route"); r != nil {
 			base += r.Value
@@ -173,7 +162,7 @@ func (s *Server) RegisterRoute(controller any) {
 			if item.Path != "" {
 				s.registerRoute(item.Method, item.Path, item.H)
 				if !item.IsHide {
-					s.add(ctl.Name, item.Method, item.Path, ctl.Name, "@"+item.Middleware.Name())
+					s.addRouteTable(ctl.Name, item.Method, item.Path, ctl.Name, "@"+item.Middleware.Name())
 				}
 			}
 
@@ -214,7 +203,7 @@ func (s *Server) RegisterRoute(controller any) {
 					s.handleError(nil, err)
 					continue
 				}
-				s.add(method.Receiver.TypeString, strings.ToUpper(hm), base+rps[i], method.Name, strings.Join(sig, ","))
+				s.addRouteTable(method.Receiver.TypeString, strings.ToUpper(hm), base+rps[i], method.Name, strings.Join(sig, ","))
 			}
 
 		}
@@ -222,28 +211,28 @@ func (s *Server) RegisterRoute(controller any) {
 	})
 }
 
-func (s *Server) registerRoute(httpmethod string, relativePath string, call HandlerFunc) error {
-	call1 := s.wrap(call)
+func (s *Server) registerRoute(method string, path string, f HandlerFunc) error {
+	call1 := s.wrap(f)
 
-	switch httpmethod {
+	switch method {
 	case "POST":
-		s.router.POST(relativePath, call1)
+		s.router.POST(path, call1)
 	case "GET":
-		s.router.GET(relativePath, call1)
+		s.router.GET(path, call1)
 	case "DELETE":
-		s.router.DELETE(relativePath, call1)
+		s.router.DELETE(path, call1)
 	case "PATCH":
-		s.router.PATCH(relativePath, call1)
+		s.router.PATCH(path, call1)
 	case "PUT":
-		s.router.PUT(relativePath, call1)
+		s.router.PUT(path, call1)
 	case "OPTIONS":
-		s.router.OPTIONS(relativePath, call1)
+		s.router.OPTIONS(path, call1)
 	case "HEAD":
-		s.router.HEAD(relativePath, call1)
+		s.router.HEAD(path, call1)
 	case "ANY", "WS":
-		s.router.ANY(relativePath, call1)
+		s.router.ANY(path, call1)
 	default:
-		return fmt.Errorf("http method:[%v -> %s] not supported", httpmethod, relativePath)
+		return fmt.Errorf("http method:[%v -> %s] not supported", method, path)
 	}
 
 	return nil
@@ -323,7 +312,7 @@ func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod) ([]strin
 	next := s.wrapM(handler)
 	// 先处理method上的中间件
 	attrs := attribute.GetMethodAttributesAsMiddleware(handler)
-	attrs1 := []string{}
+	var attrs1 []string
 	for _, attr := range attrs {
 		if mid, ok := s.middleware.GetByAttributeMethod(attr.Name); ok {
 			attrs1 = append(attrs1, mid.Attribute())
@@ -349,14 +338,13 @@ func (s *Server) handleError(ctx *Context, err error) {
 }
 
 func (s *Server) Run() error {
-	s.handleStatic()
 	s.tw.Render()
 
-	internal.OKf("fw server@%s serving at http://%s:%d%s", Version, s.option.Server.Listen, s.option.Server.Port, s.option.Server.BasePath)
+	internal.OKf("fw server@%s serving at http://%s:%d%s", Version, s.option.Listen, s.option.Port, s.option.BasePath)
 	s.server.Handler = s.router.Handler
 	s.server.StreamRequestBody = true
-	s.server.Name = "fw"
-	if s.isDev {
+	s.server.Name = s.option.Name
+	if s.option.Dev {
 		if runtime.GOOS == "darwin" {
 			internal.Note("press ⌘+C to exit...")
 		} else {
@@ -364,7 +352,7 @@ func (s *Server) Run() error {
 		}
 	}
 
-	return s.server.ListenAndServe(fmt.Sprintf("%s:%d", s.option.Server.Listen, s.option.Server.Port))
+	return s.server.ListenAndServe(fmt.Sprintf("%s:%d", s.option.Listen, s.option.Port))
 }
 
 // Use register middleware to server.

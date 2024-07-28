@@ -2,6 +2,8 @@ package fw
 
 import "github.com/linxlib/fw/attribute"
 
+//TODO: 不需要export的 都处理下
+
 type AttributeName = string
 type SlotType = string
 
@@ -12,25 +14,31 @@ type IMiddleware interface {
 	Name() string
 	// Attribute returns middleware's Attribute just like Websocket so that you can use it like // @Websocket
 	Attribute() AttributeName
+	// Slot check if middleware is at slot <param>
 	Slot(string) bool
+	// GetSlot returns slot type
 	GetSlot() SlotType
+	// SetParam pass params (strings with query format) to middleware
 	SetParam(string)
+	// GetParam return params string
 	GetParam() string
+	// doReg inner called by fw
 	doReg()
 }
 type IMiddlewareMethod interface {
 	IMiddleware
+	// CloneAsMethod returns a copy from Middleware Container
 	CloneAsMethod() IMiddlewareMethod
+	// HandlerMethod will be called when wrap a method
 	HandlerMethod(h HandlerFunc) HandlerFunc
 }
 type IMiddlewareCtl interface {
 	IMiddlewareMethod
+	// CloneAsCtl returns a copy from Middleware Container
 	CloneAsCtl() IMiddlewareCtl
+	// HandlerController will be called when handling controller
+	// returns a RouteItem(field `Path` is not empty) if you want to register a route
 	HandlerController(string) *RouteItem
-}
-
-type IMiddlewareInject interface {
-	IMiddlewareMethod
 }
 
 type IMiddlewareGlobal interface {
@@ -38,11 +46,22 @@ type IMiddlewareGlobal interface {
 }
 
 type RouteItem struct {
-	Method     string //HTTP METHOD
-	Path       string // route path
-	IsHide     bool   // if set true, this route will not be print
-	H          HandlerFunc
-	Middleware IMiddlewareMethod
+	Method     string            // HTTP METHOD
+	Path       string            // route path
+	IsHide     bool              // if set true, this route will not show in route table
+	H          HandlerFunc       // handler for this route
+	Middleware IMiddlewareMethod // just refer to middleware itself
+}
+
+// EmptyRouteItem returns an empty RouteItem which won't register route
+func EmptyRouteItem(m IMiddlewareMethod) *RouteItem {
+	return &RouteItem{
+		Method:     "",
+		Path:       "",
+		IsHide:     false,
+		H:          nil,
+		Middleware: m,
+	}
 }
 
 var _ IMiddleware = (*Middleware)(nil)

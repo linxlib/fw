@@ -3,8 +3,8 @@ package middlewares
 import (
 	"errors"
 	"fmt"
+	"github.com/linxlib/conv"
 	"github.com/linxlib/fw"
-	"github.com/linxlib/fw/internal/bytesconv"
 	"net/http"
 	"strconv"
 	"strings"
@@ -203,13 +203,13 @@ func newCors(config Config) *cors {
 }
 
 func (cors *cors) applyCors(c *fw.Context) (v bool) {
-	origin := bytesconv.BytesToString(c.GetFastContext().Request.Header.Peek("Origin"))
+	origin := conv.String(c.GetFastContext().Request.Header.Peek("Origin"))
 	if len(origin) == 0 {
 		// request is not a CORS request
 		v = true
 		return
 	}
-	host := bytesconv.BytesToString(c.GetFastContext().Host())
+	host := conv.String(c.GetFastContext().Host())
 
 	if origin == "http://"+host || origin == "https://"+host {
 		// request is not a CORS request but have origin header.
@@ -224,7 +224,7 @@ func (cors *cors) applyCors(c *fw.Context) (v bool) {
 		return
 	}
 
-	if bytesconv.BytesToString(c.GetFastContext().Method()) == "OPTIONS" {
+	if conv.String(c.GetFastContext().Method()) == "OPTIONS" {
 		cors.handlePreflight(c)
 		defer func() {
 			c.GetFastContext().SetStatusCode(cors.optionsResponseStatusCode)

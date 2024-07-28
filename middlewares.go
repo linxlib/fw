@@ -1,7 +1,7 @@
 package fw
 
-//TODO: 应该使用可排序的map
-
+// MiddlewareContainer stores middlewares
+// global middlewares will be stored with its Name as key
 type MiddlewareContainer struct {
 	ms map[SlotType]map[string]IMiddleware
 }
@@ -50,6 +50,9 @@ func (m *MiddlewareContainer) GetByAttribute(slot string, attribute string) (IMi
 		return nil, false
 	}
 }
+
+// GetGlobal iterate global middlewares
+// stop at `f` returns true
 func (m *MiddlewareContainer) GetGlobal(f func(middleware IMiddlewareGlobal) bool) bool {
 	for _, middleware := range m.ms[SlotGlobal] {
 		if f(middleware.(IMiddlewareGlobal)) == true {
@@ -59,6 +62,7 @@ func (m *MiddlewareContainer) GetGlobal(f func(middleware IMiddlewareGlobal) boo
 	return false
 }
 
+// GetByAttributeCtl find controller middleware(IMiddlewareCtl) with attribute name
 func (m *MiddlewareContainer) GetByAttributeCtl(attribute string) (IMiddlewareCtl, bool) {
 	if mid, ok := m.ms[SlotController][attribute]; ok {
 		return mid.(IMiddlewareCtl), ok
@@ -66,6 +70,8 @@ func (m *MiddlewareContainer) GetByAttributeCtl(attribute string) (IMiddlewareCt
 		return nil, false
 	}
 }
+
+// GetByAttributeMethod find method middleware(IMiddlewareMethod) with attribute name
 func (m *MiddlewareContainer) GetByAttributeMethod(attribute string) (IMiddlewareMethod, bool) {
 	if mid, ok := m.ms[SlotMethod][attribute]; ok {
 		return mid.(IMiddlewareMethod), ok

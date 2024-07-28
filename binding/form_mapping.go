@@ -3,7 +3,7 @@ package binding
 import (
 	"errors"
 	"fmt"
-	"github.com/linxlib/fw/internal/bytesconv"
+	"github.com/linxlib/conv"
 	"github.com/linxlib/fw/internal/json"
 	"mime/multipart"
 	"reflect"
@@ -265,9 +265,9 @@ func setWithProperType(val string, value reflect.Value, field reflect.StructFiel
 		case multipart.FileHeader:
 			return nil
 		}
-		return json.Unmarshal(bytesconv.StringToBytes(val), value.Addr().Interface())
+		return json.Unmarshal(conv.Bytes(val), value.Addr().Interface())
 	case reflect.Map:
-		return json.Unmarshal(bytesconv.StringToBytes(val), value.Addr().Interface())
+		return json.Unmarshal(conv.Bytes(val), value.Addr().Interface())
 	case reflect.Ptr:
 		if !value.Elem().IsValid() {
 			value.Set(reflect.New(value.Type().Elem()))

@@ -2,6 +2,7 @@ package fw
 
 import (
 	"errors"
+	"github.com/linxlib/conv"
 	"github.com/linxlib/fw/render"
 	"github.com/linxlib/inject"
 	"github.com/valyala/fasthttp"
@@ -162,10 +163,11 @@ func (c *Context) GetStringMapStringSlice(key string) (smss map[string][]string)
 }
 
 func (c *Context) Param(key string) string {
-	return c.ctx.UserValue([]byte(key)).(string)
+	return conv.String(c.ctx.UserValue(key))
 }
 
 // TODO: 完善Context所提供的方法
+
 func (c *Context) Status(code int) {
 	c.ctx.SetStatusCode(code)
 }
@@ -248,7 +250,7 @@ func (c *Context) DataFromReader(code int, contentLength int64, contentType stri
 	})
 }
 func (c *Context) File(filepath string) {
-	fasthttp.ServeFile(c.ctx, filepath)
+	c.ctx.SendFile(filepath)
 }
 
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
@@ -263,5 +265,5 @@ func (c *Context) FileAttachment(filepath, filename string) {
 	} else {
 		c.ctx.Response.Header.Set("Content-Disposition", `attachment; filename*=UTF-8''`+url.QueryEscape(filename))
 	}
-	fasthttp.ServeFile(c.ctx, filepath)
+	c.ctx.SendFile(filepath)
 }
