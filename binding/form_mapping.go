@@ -215,7 +215,8 @@ func setByForm(value reflect.Value, field reflect.StructField, form map[string][
 		}
 
 		if len(vs) > 0 {
-			val = vs[0]
+			// when request source is like "1,2,3" , but field is string type, then the field will be set to "1,2,3"
+			val = strings.Join(vs, ",")
 		}
 		if ok, err := trySetCustom(val, value); ok {
 			return ok, err

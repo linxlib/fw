@@ -2,8 +2,6 @@ package fw
 
 import "github.com/linxlib/fw/attribute"
 
-//TODO: 不需要export的 都处理下
-
 type AttributeName = string
 type SlotType = string
 
@@ -14,12 +12,10 @@ type IMiddleware interface {
 	Name() string
 	// Attribute returns middleware's Attribute just like Websocket so that you can use it like // @Websocket
 	Attribute() AttributeName
-	// Slot check if middleware is at slot <param>
-	Slot(string) bool
 	// GetSlot returns slot type
 	GetSlot() SlotType
 	// SetParam pass params (strings with query format) to middleware
-	SetParam(string)
+	SetParam(p string)
 	// GetParam return params string
 	GetParam() string
 	// doReg inner called by fw
@@ -30,7 +26,7 @@ type IMiddlewareMethod interface {
 	// CloneAsMethod returns a copy from Middleware Container
 	CloneAsMethod() IMiddlewareMethod
 	// HandlerMethod will be called when wrap a method
-	HandlerMethod(h HandlerFunc) HandlerFunc
+	HandlerMethod(next HandlerFunc) HandlerFunc
 }
 type IMiddlewareCtl interface {
 	IMiddlewareMethod
@@ -38,7 +34,7 @@ type IMiddlewareCtl interface {
 	CloneAsCtl() IMiddlewareCtl
 	// HandlerController will be called when handling controller
 	// returns a RouteItem(field `Path` is not empty) if you want to register a route
-	HandlerController(string) *RouteItem
+	HandlerController(base string) *RouteItem
 }
 
 type IMiddlewareGlobal interface {
@@ -115,12 +111,12 @@ func (m *Middleware) GetParam() string {
 	return m.param
 }
 
-func (m *Middleware) SetName(s string) {
-	m.name = s
+func (m *Middleware) SetName(name string) {
+	m.name = name
 }
 
-func (m *Middleware) SetAttribute(name AttributeName) {
-	m.attr = name
+func (m *Middleware) SetAttribute(attr AttributeName) {
+	m.attr = attr
 }
 
 func (m *Middleware) SetSlot(slotType SlotType) {
@@ -135,19 +131,15 @@ func (m *Middleware) Attribute() AttributeName {
 	return m.attr
 }
 
-func (m *Middleware) Slot(s string) bool {
-	return m.slot == s
-}
-
 func (m *Middleware) GetSlot() SlotType {
 	return m.slot
 }
 
-func (m *Middleware) SetParam(s string) {
-	m.param = s
+func (m *Middleware) SetParam(p string) {
+	m.param = p
 }
 
-func (m *Middleware) Invoke(h HandlerFunc) HandlerFunc {
+func (m *Middleware) Invoke(next HandlerFunc) HandlerFunc {
 	return nil
 }
 

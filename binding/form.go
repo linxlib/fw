@@ -1,6 +1,7 @@
 package binding
 
 import (
+	"github.com/linxlib/conv"
 	"github.com/valyala/fasthttp"
 )
 
@@ -17,10 +18,10 @@ func (formBinding) Name() string {
 func (formBinding) Bind(req *fasthttp.RequestCtx, obj any) error {
 	f := make(map[string][]string)
 	req.QueryArgs().VisitAll(func(key []byte, value []byte) {
-		f[string(key)] = []string{string(value)}
+		f[conv.String(key)] = []string{conv.String(value)}
 	})
 	req.Request.PostArgs().VisitAll(func(key, value []byte) {
-		f[string(key)] = []string{string(value)}
+		f[conv.String(key)] = []string{conv.String(value)}
 	})
 
 	if err := mapForm(obj, f); err != nil {
@@ -36,7 +37,7 @@ func (formPostBinding) Name() string {
 func (formPostBinding) Bind(req *fasthttp.RequestCtx, obj any) error {
 	f := make(map[string][]string)
 	req.Request.PostArgs().VisitAll(func(key, value []byte) {
-		f[string(key)] = []string{string(value)}
+		f[conv.String(key)] = []string{conv.String(value)}
 	})
 	if err := mapForm(obj, f); err != nil {
 		return err

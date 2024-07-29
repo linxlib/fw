@@ -1,6 +1,9 @@
 package binding
 
-import "github.com/valyala/fasthttp"
+import (
+	"github.com/linxlib/conv"
+	"github.com/valyala/fasthttp"
+)
 
 type cookieBinding struct{}
 
@@ -11,7 +14,7 @@ func (cookieBinding) Name() string {
 func (cookieBinding) Bind(req *fasthttp.RequestCtx, obj interface{}) error {
 	f := make(map[string][]string)
 	req.Request.Header.VisitAllCookie(func(k, v []byte) {
-		f[string(k)] = []string{string(v)}
+		f[conv.String(k)] = []string{conv.String(v)}
 	})
 	if err := mapFormByTag(obj, f, "cookie"); err != nil {
 		return err

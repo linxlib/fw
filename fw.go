@@ -147,10 +147,13 @@ func (s *Server) RegisterRoute(controller any) {
 		}
 		// 第一层路由 【配置文件】
 		base := s.option.BasePath
+		if base == "" {
+			base = "/"
+		}
 		// 第二层路由 @Route 标记
 
 		if r := attribute.GetStructAttrByName(ctl, controllerRoute); r != nil {
-			base += r.Value
+			base = joinRoute(base, r.Value)
 		}
 
 		//处理控制器
@@ -172,10 +175,8 @@ func (s *Server) RegisterRoute(controller any) {
 		for _, method := range ctl.Methods {
 			vm := refVal.MethodByName(method.Name)
 			vmt := reflect.TypeOf(vm.Interface())
-			//TODO: 这里获得到反射内容后 也许不需要存储到对象中
-			//TODO: param应该自带参数的索引 因为循环是不确定的
-			for i, param := range method.Params {
-				param.SetRType(vmt.In(i))
+			for _, param := range method.Params {
+				param.SetRType(vmt.In(param.Index))
 			}
 			method.SetMethod(vm.Interface())
 
@@ -198,12 +199,12 @@ func (s *Server) RegisterRoute(controller any) {
 
 			//TODO: base 和 rp拼接时需要注意下 “/”
 			for i, hm := range hms {
-				err := s.registerRoute(strings.ToUpper(hm), base+rps[i], call1)
+				err := s.registerRoute(strings.ToUpper(hm), joinRoute(base, rps[i]), call1)
 				if err != nil {
 					s.handleError(nil, err)
 					continue
 				}
-				s.addRouteTable(method.Receiver.TypeString, strings.ToUpper(hm), base+rps[i], method.Name, strings.Join(sig, ","))
+				s.addRouteTable(method.Receiver.TypeString, strings.ToUpper(hm), joinRoute(base, rps[i]), method.Name, strings.Join(sig, ","))
 			}
 
 		}

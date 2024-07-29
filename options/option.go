@@ -2,9 +2,8 @@ package options
 
 import (
 	"github.com/jinzhu/configor"
-	"github.com/linxlib/fw/internal"
+	"log"
 	"net"
-	"os"
 )
 
 type ServerOption struct {
@@ -12,7 +11,7 @@ type ServerOption struct {
 	Dev                   bool   `yaml:"dev" default:"true"`
 	Debug                 bool   `yaml:"debug" default:"true"`
 	NoColor               bool   `yaml:"nocolor" default:"false"`
-	BasePath              string `yaml:"basePath"`
+	BasePath              string `yaml:"basePath" default:"/"`
 	Listen                string `yaml:"listen" default:"127.0.0.1"` //监听地址
 	Name                  string `yaml:"name" default:"fw"`          //server_token
 	ShowRequestTimeHeader bool   `yaml:"showRequestTimeHeader,omitempty" default:"true"`
@@ -34,20 +33,14 @@ func ReadConfig(o *ServerOption) {
 
 }
 
-// TODO: 更坚挺，特别是有许多网卡时（包括虚拟网卡）
 func getIntranetIP() string {
-	addrs, err := net.InterfaceAddrs()
+	conn, err := net.Dial("udp", "114.114.114.114:80")
 	if err != nil {
-		internal.Errorf("%s", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
-	for _, address := range addrs {
-		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
-			}
+	defer conn.Close()
 
-		}
-	}
-	return "localhost"
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String()
 }

@@ -1,6 +1,9 @@
 package binding
 
-import "github.com/valyala/fasthttp"
+import (
+	"github.com/linxlib/conv"
+	"github.com/valyala/fasthttp"
+)
 
 type uriBinding struct{}
 
@@ -10,7 +13,7 @@ func (uriBinding) Name() string {
 func (uriBinding) Bind(req *fasthttp.RequestCtx, obj interface{}) error {
 	f := make(map[string][]string)
 	req.VisitUserValues(func(key []byte, a any) {
-		f[string(key)] = []string{a.(string)}
+		f[conv.String(key)] = []string{conv.String(a)}
 	})
 	if err := mapURI(obj, f); err != nil {
 		return err

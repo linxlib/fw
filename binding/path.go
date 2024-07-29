@@ -1,6 +1,7 @@
 package binding
 
 import (
+	"github.com/linxlib/conv"
 	"github.com/valyala/fasthttp"
 )
 
@@ -13,7 +14,7 @@ func (pathBinding) Name() string {
 func (pathBinding) Bind(req *fasthttp.RequestCtx, obj interface{}) error {
 	f := make(map[string][]string)
 	req.VisitUserValues(func(key []byte, a any) {
-		f[string(key)] = []string{a.(string)}
+		f[conv.String(key)] = []string{conv.String(a)}
 	})
 	if err := mapFormByTag(obj, f, "path"); err != nil {
 		return err

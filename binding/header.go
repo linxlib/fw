@@ -1,6 +1,7 @@
 package binding
 
 import (
+	"github.com/linxlib/conv"
 	"github.com/valyala/fasthttp"
 	"net/textproto"
 	"reflect"
@@ -15,7 +16,7 @@ func (headerBinding) Name() string {
 func (headerBinding) Bind(req *fasthttp.RequestCtx, obj any) error {
 	h := make(map[string][]string)
 	req.Request.Header.VisitAll(func(key, value []byte) {
-		h[string(key)] = []string{string(value)}
+		h[conv.String(key)] = []string{conv.String(value)}
 	})
 	if err := mapHeader(obj, h); err != nil {
 		return err

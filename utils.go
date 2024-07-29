@@ -2,6 +2,7 @@ package fw
 
 import (
 	"encoding/xml"
+	"strings"
 	"unicode"
 )
 
@@ -35,4 +36,27 @@ func isASCII(s string) bool {
 		}
 	}
 	return true
+}
+
+func joinRoute(base string, r string) string {
+	var result = base
+	if r == "/" || r == "" {
+
+		if strings.HasSuffix(result, "/") {
+			result = strings.TrimSuffix(result, "/")
+			r = ""
+		} else {
+			r = strings.TrimSuffix(r, "/")
+			result += r
+		}
+	} else {
+		if strings.HasSuffix(result, "/") {
+			r = strings.TrimPrefix(r, "/")
+			result += r
+		} else {
+			r = strings.TrimPrefix(r, "/")
+			result += "/" + r
+		}
+	}
+	return result
 }
