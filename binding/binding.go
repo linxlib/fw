@@ -159,7 +159,7 @@ func GetByAttr(attr *attribute.Attribute) Binding {
 	case "Json", "Body":
 		return JSON
 	default:
-		return nil
+		return JSON
 	}
 }
 

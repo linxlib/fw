@@ -197,7 +197,6 @@ func (s *Server) RegisterRoute(controller any) {
 				sig = append(sig, "@"+attr)
 			}
 
-			//TODO: base 和 rp拼接时需要注意下 “/”
 			for i, hm := range hms {
 				err := s.registerRoute(strings.ToUpper(hm), joinRoute(base, rps[i]), call1)
 				if err != nil {

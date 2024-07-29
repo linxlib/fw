@@ -19,7 +19,7 @@ framework 简称
 ## TODO List
 
 - [x] WebsocketHub 作为 控制器级别中间件
-- [ ] RecoveryMiddleware 作为 全局中间件
+- [x] RecoveryMiddleware 作为 全局中间件
 - [ ] 日志类
 - [x] 配置写出
 - [ ] Swagger
@@ -27,12 +27,12 @@ framework 简称
 - [ ] WebLogMiddleware
 - [x] ServerDownMiddleware 作为全局中间件
 - [ ] ResponseRewriter 作为全局或ctl中间件
-- [ ] CorsMiddleware 全局中间件
-- [ ] Crud 中间件
-- [ ] 数据库或者服务的注入
+- [x] CorsMiddleware 全局中间件
+- [x] ~~Crud 中间件~~ SimpleCrudController
+- [x] 数据库或者服务的注入
 - [ ] 运行为 系统服务 
-- [ ] 开发模式
+- [x] 开发模式
 - [ ] 检测代码自动重启功能
 - [ ] Grpc
-- [ ] 泛型支持
+- [x] 泛型支持
 - [ ] AuthMiddleware 全局或ctl或method
