@@ -1,0 +1,38 @@
+basePath: ""
+listen: 0.0.0.0
+# server_token & server name
+name: "fw"
+title: "fw api - OpenAPI 3.0"
+# send "Request-Time" header
+showRequestTimeHeader: true
+port: 2024
+astFile: gen.json
+# developing mode
+dev: true
+debug: true
+# disable colorful output
+nocolor: false
+logger:
+  # 0-6 0: Panic 6: Trace
+  loggerLevel: 5
+  separateLevelFile: false
+  logDir: "./log/fw"
+  rotate: false
+  # Unit: M
+  maxSize: 5
+  maxAge: 28
+  maxBackups: 3
+  compress: false
+  localTime: true
+cache:
+  # redis||go-cache||file
+  type: redis
+  prefix: cache_
+  file:
+    filepath: 0.db
+  go-cache:
+    defaultExpiration: 24h
+    cleanupInterval: 5m
+  redis:
+    url: 10.10.0.16:6379
+

@@ -13,7 +13,7 @@ func (uriBinding) Name() string {
 func (uriBinding) Bind(req *fasthttp.RequestCtx, obj interface{}) error {
 	f := make(map[string][]string)
 	req.VisitUserValues(func(key []byte, a any) {
-		f[conv.String(key)] = []string{conv.String(a)}
+		f[conv.String(key)] = arrValues(a)
 	})
 	if err := mapURI(obj, f); err != nil {
 		return err

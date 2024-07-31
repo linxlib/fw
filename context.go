@@ -3,13 +3,16 @@ package fw
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"github.com/linxlib/conv"
 	"github.com/linxlib/fw/render"
 	"github.com/linxlib/inject"
+	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -78,6 +81,7 @@ func (c *Context) Get(key string) (value any, exists bool) {
 	value, exists = c.Keys[key]
 	return
 }
+
 func (c *Context) MustGet(key string) any {
 	if value, exists := c.Get(key); exists {
 		return value
@@ -218,6 +222,19 @@ func (c *Context) Error(err error) *Error {
 func (c *Context) JSON(code int, obj any) {
 	c.Render(code, render.JSON{Data: obj})
 }
+func (c *Context) JSONP(data any, callback ...string) {
+	var cb string
+
+	if len(callback) > 0 {
+		cb = callback[0]
+	} else {
+		cb = "callback"
+	}
+	c.Render(200, render.JsonpJSON{
+		Callback: cb,
+		Data:     data,
+	})
+}
 func (c *Context) AsciiJSON(code int, obj any) {
 	c.Render(code, render.AsciiJSON{Data: obj})
 }
@@ -254,6 +271,10 @@ func (c *Context) File(filepath string) {
 	c.ctx.SendFile(filepath)
 }
 
+// Protocol returns the HTTP protocol of request: HTTP/1.1 and HTTP/2.
+func (c *Context) Protocol() string {
+	return conv.String(c.ctx.Request.Header.Protocol())
+}
 func (c *Context) HTML(code int, name string, obj any) {
 
 }
@@ -277,4 +298,173 @@ func (c *Context) FileAttachment(filepath, filename string) {
 		c.ctx.Response.Header.Set("Content-Disposition", `attachment; filename*=UTF-8''`+url.QueryEscape(filename))
 	}
 	c.ctx.SendFile(filepath)
+}
+
+// Vary adds the given header field to the Vary response header.
+// This will append the header, if not already listed, otherwise leaves it listed in the current location.
+func (c *Context) Vary(fields ...string) {
+	c.Append(fasthttp.HeaderVary, fields...)
+}
+
+// Write appends p into response body.
+func (c *Context) Write(p []byte) (int, error) {
+	c.ctx.Response.AppendBody(p)
+	return len(p), nil
+}
+
+// Writef appends `f` & `a` into response body writer.
+func (c *Context) Writef(f string, a ...any) (int, error) {
+	//nolint:wrap check // This must not be wrapped
+	return fmt.Fprintf(c.ctx.Response.BodyWriter(), f, a...)
+}
+
+// WriteString appends s to response body.
+func (c *Context) WriteString(s string) {
+	c.ctx.Response.SetBodyString(s)
+}
+
+// SendStatus sets the HTTP status code and if the response body is empty,
+// it sets the correct status message in the body.
+func (c *Context) SendStatus(status int) {
+	c.Status(status)
+
+	// Only set status body when there is no response body
+	if len(c.ctx.Response.Body()) == 0 {
+		c.WriteString(StatusMessage(status))
+		return
+	}
+}
+
+// XHR returns a Boolean property, that is true, if the request's X-Requested-With header field is XMLHttpRequest,
+// indicating that the request was issued by a client library (such as jQuery).
+func (c *Context) XHR() bool {
+	return EqualFold(conv.Bytes(c.GetHeader(fasthttp.HeaderXRequestedWith)), []byte("xmlhttprequest"))
+}
+
+// GetHeader returns the HTTP request header specified by field.
+// Field names are case-insensitive
+// Returned value is only valid within the handler. Do not store any references.
+// Make copies or use the Immutable setting instead.
+func (c *Context) GetHeader(key string, defaultValue ...string) string {
+	return GetReqHeader(c, key, defaultValue...)
+}
+
+// GetReqHeader returns the HTTP request header specified by filed.
+// This function is generic and can handle differnet headers type values.
+func GetReqHeader[V GenericType](c *Context, key string, defaultValue ...V) V {
+	var v V
+	return genericParseType[V](conv.String(c.ctx.Request.Header.Peek(key)), v, defaultValue...)
+}
+
+// Append the specified value to the HTTP response header field.
+// If the header is not already set, it creates the header with the specified value.
+func (c *Context) Append(field string, values ...string) {
+	if len(values) == 0 {
+		return
+	}
+	h := conv.String(c.ctx.Response.Header.Peek(field))
+	originalH := h
+	for _, value := range values {
+		if len(h) == 0 {
+			h = value
+		} else if h != value && !strings.HasPrefix(h, value+",") && !strings.HasSuffix(h, " "+value) &&
+			!strings.Contains(h, " "+value+",") {
+			h += ", " + value
+		}
+	}
+	if originalH != h {
+		c.Set(field, h)
+	}
+}
+
+var localHosts = [...]string{"127.0.0.1", "::1"}
+
+// IsLocalHost will return true if address is a localhost address.
+func (*Context) isLocalHost(address string) bool {
+	for _, h := range localHosts {
+		if address == h {
+			return true
+		}
+	}
+	return false
+}
+
+// IsFromLocal will return true if request came from local.
+func (c *Context) IsFromLocal() bool {
+	return c.isLocalHost(c.ctx.RemoteIP().String())
+}
+
+// Type sets the Content-Type HTTP header to the MIME type specified by the file extension.
+func (c *Context) Type(extension string, charset ...string) {
+	if len(charset) > 0 {
+		c.ctx.Response.Header.SetContentType(GetMIME(extension) + "; charset=" + charset[0])
+	} else {
+		c.ctx.Response.Header.SetContentType(GetMIME(extension))
+	}
+}
+func (c *Context) Method() string {
+	return conv.String(c.ctx.Method())
+}
+func (c *Context) setCanonical(key, val string) {
+	c.ctx.Response.Header.SetCanonical(conv.Bytes(key), conv.Bytes(val))
+}
+
+// Location sets the response Location HTTP header to the specified path parameter.
+func (c *Context) Location(path string) {
+	c.setCanonical("Location", path)
+}
+
+// ContextString returns unique string representation of the ctx.
+//
+// The returned value may be useful for logging.
+func (c *Context) ContextString() string {
+	// Get buffer from pool
+	buf := bytebufferpool.Get()
+
+	// Start with the ID, converting it to a hex string without fmt.Sprintf
+	buf.WriteByte('#')
+	// Convert ID to hexadecimal
+	id := strconv.FormatUint(c.ctx.ID(), 16)
+	// Pad with leading zeros to ensure 16 characters
+	for i := 0; i < (16 - len(id)); i++ {
+		buf.WriteByte('0')
+	}
+	buf.WriteString(id)
+	buf.WriteString(" - ")
+
+	// Add local and remote addresses directly
+	buf.WriteString(c.ctx.LocalAddr().String())
+	buf.WriteString(" <-> ")
+	buf.WriteString(c.ctx.RemoteAddr().String())
+	buf.WriteString(" - ")
+
+	// Add method and URI
+	buf.Write(c.ctx.Request.Header.Method())
+	buf.WriteByte(' ')
+	buf.Write(c.ctx.URI().FullURI())
+
+	// Allocate string
+	str := buf.String()
+
+	// Reset buffer
+	buf.Reset()
+	bytebufferpool.Put(buf)
+
+	return str
+}
+
+// SetHeader sets the response's HTTP header field to the specified key, value.
+func (c *Context) SetHeader(key, val string) {
+	c.ctx.Response.Header.Set(key, val)
+}
+
+// SendStream sets response body stream and optional body size.
+func (c *Context) SendStream(stream io.Reader, size ...int) error {
+	if len(size) > 0 && size[0] >= 0 {
+		c.ctx.Response.SetBodyStream(stream, size[0])
+	} else {
+		c.ctx.Response.SetBodyStream(stream, -1)
+	}
+
+	return nil
 }

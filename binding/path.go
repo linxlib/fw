@@ -14,7 +14,8 @@ func (pathBinding) Name() string {
 func (pathBinding) Bind(req *fasthttp.RequestCtx, obj interface{}) error {
 	f := make(map[string][]string)
 	req.VisitUserValues(func(key []byte, a any) {
-		f[conv.String(key)] = []string{conv.String(a)}
+		k := conv.String(key)
+		f[k] = append(f[k], conv.String(a))
 	})
 	if err := mapFormByTag(obj, f, "path"); err != nil {
 		return err

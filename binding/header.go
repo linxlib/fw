@@ -16,7 +16,8 @@ func (headerBinding) Name() string {
 func (headerBinding) Bind(req *fasthttp.RequestCtx, obj any) error {
 	h := make(map[string][]string)
 	req.Request.Header.VisitAll(func(key, value []byte) {
-		h[conv.String(key)] = []string{conv.String(value)}
+		k := conv.String(key)
+		h[k] = append(h[k], conv.String(value))
 	})
 	if err := mapHeader(obj, h); err != nil {
 		return err

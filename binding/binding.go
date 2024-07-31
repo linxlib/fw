@@ -1,9 +1,10 @@
 package binding
 
 import (
+	valid "github.com/gookit/validate"
+	"github.com/gookit/validate/locales/zhcn"
 	"github.com/linxlib/fw/attribute"
 	"github.com/valyala/fasthttp"
-	"net/http"
 )
 
 // Content-Type MIME of the most common data formats.
@@ -91,7 +92,7 @@ var (
 // Default returns the appropriate Binding instance based on the HTTP method
 // and the content type.
 func Default(method, contentType string) Binding {
-	if method == http.MethodGet {
+	if method == fasthttp.MethodGet {
 		return Form
 	}
 
@@ -164,9 +165,12 @@ func GetByAttr(attr *attribute.Attribute) Binding {
 }
 
 func validate(obj any) error {
-	return nil
-	//if Validator == nil {
-	//	return nil
-	//}
-	//return Validator.ValidateStruct(obj)
+	v := valid.New(obj)
+	v.Validate()
+
+	return v.ValidateErr()
+}
+
+func init() {
+	zhcn.RegisterGlobal()
 }

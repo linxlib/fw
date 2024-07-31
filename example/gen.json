@@ -1,0 +1,81 @@
+{
+  "github.com/linxlib/fw/example.main.go": {
+    "Name": "main.go",
+    "PackageName": "main",
+    "Imports": [
+      {
+        "Name": "fw",
+        "Alias": "_",
+        "ImportPath": "github.com/linxlib/fw",
+        "IsIgnore": false
+      }
+    ],
+    "PackagePath": "github.com/linxlib/fw/example",
+    "FilePath": "E:\\repos\\fw\\example\\main.go",
+    "Structs": [
+      {
+        "Name": "Hello",
+        "PackagePath": "github.com/linxlib/fw/example",
+        "KeyHash": "",
+        "Fields": null,
+        "Methods": [
+          {
+            "Receiver": {
+              "Name": "h",
+              "Pointer": true,
+              "TypeString": "Hello",
+              "Type": null
+            },
+            "Index": 0,
+            "PackagePath": "github.com/linxlib/fw/example",
+            "Name": "Hello",
+            "Private": false,
+            "Signature": "",
+            "Docs": [
+              "Hello",
+              "@GET /hello"
+            ],
+            "Comments": "",
+            "Params": [
+              {
+                "Index": 0,
+                "Name": "ctx",
+                "PackagePath": "github.com/linxlib/fw",
+                "Type": null,
+                "HasTag": false,
+                "TypeString": "*fw.Context",
+                "InnerType": true,
+                "Private": true,
+                "Pointer": true,
+                "Slice": false,
+                "IsStruct": true,
+                "Docs": null,
+                "Comment": "",
+                "IsGeneric": false
+              }
+            ],
+            "Results": null,
+            "IsGeneric": false,
+            "TypeParams": null
+          }
+        ],
+        "HasParent": false,
+        "IsInterface": false,
+        "Inter": null,
+        "Docs": [
+          "Hello",
+          "@Controller"
+        ],
+        "Comment": "",
+        "IsGeneric": false,
+        "TypeParams": null
+      }
+    ],
+    "Docs": null,
+    "Comments": null,
+    "Methods": null,
+    "Funcs": null,
+    "Consts": null,
+    "Vars": null
+  }
+}

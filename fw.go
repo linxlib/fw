@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"github.com/fasthttp/router"
 	"github.com/linxlib/astp"
-	"github.com/linxlib/conv"
 	"github.com/linxlib/fw/attribute"
 	"github.com/linxlib/fw/binding"
 	"github.com/linxlib/fw/internal"
-	"github.com/linxlib/fw/internal/json"
 	"github.com/linxlib/fw/options"
 	"github.com/linxlib/inject"
 	"github.com/olekukonko/tablewriter"
@@ -45,6 +43,12 @@ func New() *Server {
 	logger.SetOutput(os.Stdout)
 	logger.SetFormatter(Console())
 	logger.SetLevel(logrus.InfoLevel)
+
+	defer func() {
+		if err := recover(); err != nil {
+			logger.Error(err)
+		}
+	}()
 
 	options.ReadConfig(s.option)
 	logger.SetLevel(logrus.Level(s.option.Logger.LoggerLevel))
@@ -108,11 +112,6 @@ func New() *Server {
 
 	s.logger = logger
 
-	if s.option.Debug {
-		bs, _ := json.MarshalIndent(s.option, "", "    ")
-		s.logger.Debugln(conv.String(bs))
-	}
-
 	s.Map(s.option)
 	s.Map(s.logger)
 	s.Map(s)
@@ -167,7 +166,6 @@ func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 		if s.option.ShowRequestTimeHeader {
 			c.ctx.Response.Header.Set(s.option.RequestTimeHeader, time.Since(start).String())
 		}
-		//fmt.Printf("call spend: %s\n", time.Since(start).String())
 	}
 }
 
@@ -216,6 +214,11 @@ const controllerAttr = "Controller"
 const controllerRoute = "Route"
 
 func (s *Server) RegisterRoute(controller any) {
+	defer func() {
+		if err := recover(); err != nil {
+			s.logger.Error(err)
+		}
+	}()
 	//假定astp已经解析好了整个项目，并通过某种方式还原了Parser内部的值
 	// 这里需要通过传入的controller指针 并通过反射方式获取到 controller method param result各种的反射值，并填充到已有的Parser里
 	// 这里的指针 通过代码生成的方式
@@ -234,7 +237,10 @@ func (s *Server) RegisterRoute(controller any) {
 			s.midGlobals = append(s.midGlobals, item.Middleware)
 			if item.Path != "" {
 
-				s.registerRoute(item.Method, item.Path, item.H)
+				err := s.registerRoute(item.Method, item.Path, item.H)
+				if err != nil {
+					panic(err)
+				}
 				if !item.IsHide {
 					s.addRouteTable("Global", item.Method, item.Path, "", "@"+item.Middleware.Name())
 				}
@@ -267,7 +273,11 @@ func (s *Server) RegisterRoute(controller any) {
 		for _, item := range m {
 			mids = append(mids, item.Middleware)
 			if item.Path != "" {
-				s.registerRoute(item.Method, item.Path, item.H)
+				err := s.registerRoute(item.Method, item.Path, item.H)
+				if err != nil {
+					s.handleError(err)
+					continue
+				}
 				if !item.IsHide {
 					s.addRouteTable(ctl.Name, item.Method, item.Path, ctl.Name, "@"+item.Middleware.Name())
 				}
@@ -310,7 +320,7 @@ func (s *Server) RegisterRoute(controller any) {
 			for i, hm := range hms {
 				err := s.registerRoute(strings.ToUpper(hm), joinRoute(base, rps[i]), call1)
 				if err != nil {
-					s.handleError(nil, err)
+					s.handleError(err)
 					continue
 				}
 				controllerName := method.Receiver.TypeString
@@ -377,7 +387,7 @@ func (s *Server) bind(c *Context, handler *astp.Method) {
 				}
 				// 对方法参数进行数据映射和校验
 				if err := binding.GetByAttr(cmd).Bind(c.GetFastContext(), body.Interface()); err != nil {
-					s.handleError(c, err)
+					s.handleError(err)
 				}
 			}
 			c.Map(body.Interface())
@@ -389,7 +399,10 @@ func (s *Server) bind(c *Context, handler *astp.Method) {
 func (s *Server) wrapM(handler *astp.Method) HandlerFunc {
 	return func(context *Context) {
 		s.bind(context, handler)
-		_, _ = context.Injector().Invoke(handler.GetMethod())
+		_, err := context.Injector().Invoke(handler.GetMethod())
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -451,7 +464,7 @@ func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod) ([]strin
 	return attrs1, next
 }
 
-func (s *Server) handleError(ctx *Context, err error) {
+func (s *Server) handleError(err error) {
 
 }
 
@@ -476,6 +489,6 @@ func (s *Server) Run() error {
 // Use register middleware to server.
 // you can only use the @'Attribute' after register a middleware
 func (s *Server) Use(middleware IMiddleware) {
-	s.Apply(middleware)
+	_ = s.Apply(middleware)
 	s.middleware.Reg(middleware)
 }

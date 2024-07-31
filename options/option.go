@@ -2,7 +2,6 @@ package options
 
 import (
 	"github.com/jinzhu/configor"
-	"log"
 	"net"
 )
 
@@ -41,15 +40,13 @@ func ReadConfig(o *ServerOption) {
 	}).Load(o, "config/config.yaml")
 	if err != nil {
 		panic(err)
-		return
 	}
-
 }
 
 func getIntranetIP() string {
 	conn, err := net.Dial("udp", "114.114.114.114:80")
 	if err != nil {
-		log.Fatal(err)
+		return "127.0.0.1"
 	}
 	defer conn.Close()
 
