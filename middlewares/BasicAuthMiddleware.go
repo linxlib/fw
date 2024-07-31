@@ -59,7 +59,7 @@ func authorizationHeader(user, password string) string {
 }
 
 type BasicAuthMiddleware struct {
-	fw.MiddlewareCtl
+	*fw.MiddlewareCtl
 	realm string
 	proxy bool
 	pairs authPairs
@@ -134,13 +134,7 @@ func (b *BasicAuthMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
 }
 
 func (b *BasicAuthMiddleware) HandlerController(base string) *fw.RouteItem {
-	return &fw.RouteItem{
-		Method:     "",
-		Path:       "",
-		IsHide:     false,
-		H:          nil,
-		Middleware: b,
-	}
+	return fw.EmptyRouteItem(b)
 }
 
 func NewBasicAuthMiddleware() fw.IMiddlewareCtl {

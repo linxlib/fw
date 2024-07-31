@@ -23,7 +23,7 @@ func NewWebsocketMiddleware() fw.IMiddlewareMethod {
 
 // WebsocketMiddleware used for simple websocket communication with server
 type WebsocketMiddleware struct {
-	fw.MiddlewareMethod
+	*fw.MiddlewareMethod
 	upgrade websocket.FastHTTPUpgrader
 }
 

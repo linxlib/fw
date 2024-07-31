@@ -33,7 +33,7 @@ func NewWebsocketHubMiddleware() fw.IMiddlewareCtl {
 // WebsocketHubMiddleware
 // used for chat
 type WebsocketHubMiddleware struct {
-	fw.MiddlewareCtl
+	*fw.MiddlewareCtl
 	upgrade websocket.FastHTTPUpgrader
 	hub     *Hub
 	route   string

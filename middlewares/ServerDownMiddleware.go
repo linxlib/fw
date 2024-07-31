@@ -9,7 +9,7 @@ import (
 
 // ServerDownMiddleware is a middleware which provides an api to mark server down.
 type ServerDownMiddleware struct {
-	fw.MiddlewareGlobal
+	*fw.MiddlewareGlobal
 	key        string
 	serverDown bool
 }

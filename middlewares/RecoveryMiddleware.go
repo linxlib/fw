@@ -3,25 +3,33 @@ package middlewares
 import (
 	"bytes"
 	"fmt"
+	"github.com/gookit/color"
+	"github.com/linxlib/conv"
 	"github.com/linxlib/fw"
 	"io"
-	"log"
 	"os"
 	"runtime"
 	"time"
 )
 
+type RecoveryOptions struct {
+
+	// if true, panic info and request info will show as web page
+	// else output json to response
+	// won't output stack trace to response unless the environment FW_DEBUG=true
+	NiceWeb bool
+	// whether output to console
+	// won't output stack trace to console unless the environment FW_DEBUG=true
+	Console bool
+	// writer. just use logger's output
+	Output io.Writer
+}
+
 // RecoveryMiddleware globally recover from panic
 type RecoveryMiddleware struct {
-	fw.MiddlewareGlobal
-	writer io.Writer
-	// if true, panic info and request info will show as web page (false when production)
-	// else output something to response
-	niceWeb bool
-	// output to console
-	console bool
-	// defines whether show with color
-	color bool
+	*fw.MiddlewareGlobal
+	options *RecoveryOptions
+	isDebug bool
 }
 
 func (s *RecoveryMiddleware) CloneAsMethod() fw.IMiddlewareMethod {
@@ -32,6 +40,16 @@ func (s *RecoveryMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
 	return func(context *fw.Context) {
 		defer func() {
 			if err := recover(); err != nil {
+				var errMsg string
+				switch err.(type) {
+				case error:
+					errMsg = err.(error).Error()
+				case string:
+					errMsg = err.(string)
+				default:
+					errMsg = ""
+				}
+
 				//var brokenPipe bool
 				//if ne, ok := err.(*net.OpError); ok {
 				//	if se, ok := ne.Err.(*os.SyscallError); ok {
@@ -41,13 +59,19 @@ func (s *RecoveryMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
 				//	}
 				//}
 				stack := stack(3)
-				if s.writer != nil {
+				if s.options.Output != nil {
 					//DUMP http request、headers etc.
-					s.writer.Write([]byte("Panic:\n"))
-					s.writer.Write(stack)
+					if s.isDebug {
+						color.Fprintf(s.options.Output,
+							"["+color.HiCyan.Render("Recovery")+"] panic recovered: %s\n"+color.HiYellow.Render("Stack Trace:")+"\n%s\n",
+							color.HiRed.Render(errMsg),
+							color.HiMagenta.Render(conv.String(stack)))
+					} else {
+						color.Fprintf(s.options.Output,
+							"["+color.HiCyan.Render("Recovery")+"] panic recovered: %s\n",
+							color.HiRed.Render(errMsg))
+					}
 
-				} else {
-					log.Println(string(stack))
 				}
 
 			}
@@ -57,27 +81,22 @@ func (s *RecoveryMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
 }
 
 func (s *RecoveryMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewRecoveryMiddleware()
+	return NewRecoveryMiddleware(s.options)
 }
 
 func (s *RecoveryMiddleware) HandlerController(base string) *fw.RouteItem {
 
-	return &fw.RouteItem{
-		Method:     "",
-		Path:       "",
-		IsHide:     false,
-		H:          nil,
-		Middleware: s,
-	}
+	return fw.EmptyRouteItem(s)
 }
 
 const recoveryName = "Recovery"
 
-func NewRecoveryMiddleware() fw.IMiddlewareGlobal {
-
+func NewRecoveryMiddleware(o *RecoveryOptions) fw.IMiddlewareGlobal {
+	isDebug := os.Getenv("FW_DEBUG") == "true"
 	return &RecoveryMiddleware{
 		MiddlewareGlobal: fw.NewMiddlewareGlobal(recoveryName),
-		writer:           os.Stdout,
+		options:          o,
+		isDebug:          isDebug,
 	}
 }
 

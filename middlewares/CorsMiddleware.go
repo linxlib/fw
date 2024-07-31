@@ -12,7 +12,7 @@ import (
 )
 
 type CorsMiddleware struct {
-	fw.MiddlewareGlobal
+	*fw.MiddlewareGlobal
 	config Config
 }
 

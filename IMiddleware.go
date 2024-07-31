@@ -62,27 +62,27 @@ func EmptyRouteItem(m IMiddlewareMethod) *RouteItem {
 
 var _ IMiddleware = (*Middleware)(nil)
 
-func NewMiddleware(name string, slot string, attr string) Middleware {
-	return Middleware{
+func NewMiddleware(name string, slot string, attr string) *Middleware {
+	return &Middleware{
 		slot: slot,
 		name: name,
 		attr: attr,
 	}
 }
 
-func NewMiddlewareMethod(name string, attr string) MiddlewareMethod {
-	return MiddlewareMethod{
+func NewMiddlewareMethod(name string, attr string) *MiddlewareMethod {
+	return &MiddlewareMethod{
 		Middleware: NewMiddleware(name, SlotMethod, attr),
 	}
 }
-func NewMiddlewareCtl(name string, attr string) MiddlewareCtl {
-	return MiddlewareCtl{
+func NewMiddlewareCtl(name string, attr string) *MiddlewareCtl {
+	return &MiddlewareCtl{
 		Middleware: NewMiddleware(name, SlotController, attr),
 	}
 }
 
-func NewMiddlewareGlobal(name string) MiddlewareGlobal {
-	return MiddlewareGlobal{
+func NewMiddlewareGlobal(name string) *MiddlewareGlobal {
+	return &MiddlewareGlobal{
 		Middleware: NewMiddleware(name, SlotGlobal, ""),
 	}
 }
@@ -139,20 +139,16 @@ func (m *Middleware) SetParam(p string) {
 	m.param = p
 }
 
-func (m *Middleware) Invoke(next HandlerFunc) HandlerFunc {
-	return nil
-}
-
 type MiddlewareCtl struct {
-	Middleware
+	*Middleware
 }
 
 type MiddlewareMethod struct {
-	Middleware
+	*Middleware
 }
 
 type MiddlewareGlobal struct {
-	Middleware
+	*Middleware
 }
 
 const (

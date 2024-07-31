@@ -3,19 +3,16 @@ package attribute
 import "github.com/linxlib/astp"
 
 var innerAttrNames = map[string]AttributeType{
-	"OpenApiDoc": TypeOther,
-	"GET":        TypeHttpMethod,
-	"POST":       TypeHttpMethod,
-	"PUT":        TypeHttpMethod,
-	"DELETE":     TypeHttpMethod,
-	"HEAD":       TypeHttpMethod,
-	"OPTIONS":    TypeHttpMethod,
-	"TRACE":      TypeHttpMethod,
-	"CONNECT":    TypeHttpMethod,
-	"ANY":        TypeHttpMethod,
-	"WS":         TypeHttpMethod,
-	"Deprecated": TypeOther,
-	"Ignore":     TypeOther,
+	"GET":     TypeHttpMethod,
+	"POST":    TypeHttpMethod,
+	"PUT":     TypeHttpMethod,
+	"DELETE":  TypeHttpMethod,
+	"HEAD":    TypeHttpMethod,
+	"OPTIONS": TypeHttpMethod,
+	"TRACE":   TypeHttpMethod,
+	"CONNECT": TypeHttpMethod,
+	"ANY":     TypeHttpMethod,
+	"WS":      TypeHttpMethod,
 }
 
 func AddMethodAttributeType(name string, typ AttributeType) {

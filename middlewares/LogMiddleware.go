@@ -2,8 +2,11 @@ package middlewares
 
 import (
 	"fmt"
+	"github.com/gookit/color"
+	"github.com/linxlib/conv"
 	"github.com/linxlib/fw"
-	"github.com/linxlib/fw/types"
+	"github.com/sirupsen/logrus"
+	"net/http"
 	"net/url"
 	"time"
 )
@@ -29,27 +32,72 @@ type LogParams struct {
 	Keys map[string]any
 }
 
+func (p *LogParams) TimeStampWithColor() string {
+	return color.HiWhite.Sprint(p.TimeStamp.Format(time.DateTime))
+}
+func (p *LogParams) LatencyWithColor() string {
+	return color.HiWhite.Sprint(p.Latency.String())
+}
+func (p *LogParams) ClientIPWithColor() string {
+	return color.HiWhite.Sprint(p.ClientIP)
+}
+func (p *LogParams) StatusCodeWithColor() string {
+	code := p.StatusCode
+	switch {
+	case code >= http.StatusContinue && code < http.StatusOK:
+		return color.White.Sprint(code)
+	case code >= http.StatusOK && code < http.StatusMultipleChoices:
+		return color.Green.Sprint(code)
+	case code >= http.StatusMultipleChoices && code < http.StatusBadRequest:
+		return color.White.Sprint(code)
+	case code >= http.StatusBadRequest && code < http.StatusInternalServerError:
+		return color.Yellow.Sprint(code)
+	default:
+		return color.Red.Sprint(code)
+	}
+}
+
+func (p *LogParams) MethodWithColor() string {
+	switch p.Method {
+	case "GET":
+		return color.Blue.Sprint(p.Method)
+	case "POST":
+		return color.Cyan.Sprint(p.Method)
+	case "PUT":
+		return color.Yellow.Sprint(p.Method)
+	case "DELETE":
+		return color.Red.Sprint(p.Method)
+	case "PATCH":
+		return color.Green.Sprint(p.Method)
+	case "HEAD":
+		return color.Magenta.Sprint(p.Method)
+	case "OPTIONS":
+		return color.White.Sprint(p.Method)
+	default:
+		return color.Normal.Sprint(p.Method)
+	}
+}
+
 const (
 	logAttr = "Log"
 	logName = "Log"
 )
 
-func NewLogMiddleware(logger types.ILogger) fw.IMiddlewareCtl {
+func NewLogMiddleware(logger *logrus.Logger) fw.IMiddlewareCtl {
 	return &LogMiddleware{
 		MiddlewareCtl: fw.NewMiddlewareCtl(logName, logAttr),
-		logger:        logger}
+		logger:        logger,
+	}
 }
 
 // LogMiddleware
 // for logging request info.
 // can be used on Controller or Method
 type LogMiddleware struct {
-	fw.MiddlewareCtl
-	logger types.ILogger
+	*fw.MiddlewareCtl
+	logger *logrus.Logger `inject:""`
 	// real_ip_header=CF-Connecting-IP
 	realIPHeader string
-
-	start time.Time
 }
 
 func (w *LogMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
@@ -57,13 +105,7 @@ func (w *LogMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
 }
 
 func (w *LogMiddleware) HandlerController(s string) *fw.RouteItem {
-	return &fw.RouteItem{
-		Method:     "",
-		Path:       "",
-		IsHide:     false,
-		H:          nil,
-		Middleware: w,
-	}
+	return fw.EmptyRouteItem(w)
 }
 
 func (w *LogMiddleware) CloneAsMethod() fw.IMiddlewareMethod {
@@ -79,32 +121,31 @@ func (w *LogMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
 		w.realIPHeader = values.Get("real_ip_header")
 	}
 	return func(context *fw.Context) {
-		//log.Println("LoggerMiddleware called")
 		fctx := context.GetFastContext()
-		w.start = time.Now()
-		params := LogParams{}
+		start := time.Now()
+		params := &LogParams{}
 		params.BodySize = len(fctx.PostBody())
-		params.Path = string(fctx.Path())
+		params.Path = conv.String(fctx.Request.RequestURI())
 		// add Cloudflare CDN real ip header support
 		if w.realIPHeader != "" {
 			params.ClientIP = string(fctx.Request.Header.Peek(w.realIPHeader))
 		}
 		params.ClientIP = fctx.RemoteIP().String()
-		params.Method = string(fctx.Method())
+		params.Method = conv.String(fctx.Method())
 		next(context)
 		params.TimeStamp = time.Now()
-		params.Latency = params.TimeStamp.Sub(w.start)
+		params.Latency = params.TimeStamp.Sub(start)
 		params.StatusCode = fctx.Response.StatusCode()
 		err, exist := context.Get("fw_err")
 		if exist && err != nil {
-			params.ErrorMessage = "Err:" + err.(error).Error()
+			params.ErrorMessage = "\nErr:" + err.(error).Error()
 		}
 
-		w.logger.Infof("|%3d| %13v | %15s | %-7s %#v %s\n%s",
-			params.StatusCode,
-			params.Latency.String(),
-			params.ClientIP,
-			params.Method,
+		w.logger.Printf("|%3s| %18s | %15s | %-7s %s %s%s",
+			params.StatusCodeWithColor(),
+			params.LatencyWithColor(),
+			params.ClientIPWithColor(),
+			params.MethodWithColor(),
 			params.Path,
 			byteCountSI(int64(params.BodySize)),
 			params.ErrorMessage,

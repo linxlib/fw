@@ -4,15 +4,17 @@ import (
 	"fmt"
 	"github.com/fasthttp/router"
 	"github.com/linxlib/astp"
+	"github.com/linxlib/conv"
 	"github.com/linxlib/fw/attribute"
 	"github.com/linxlib/fw/binding"
 	"github.com/linxlib/fw/internal"
 	"github.com/linxlib/fw/internal/json"
 	"github.com/linxlib/fw/options"
-	"github.com/linxlib/fw/types"
 	"github.com/linxlib/inject"
 	"github.com/olekukonko/tablewriter"
+	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
+	"gopkg.in/natefinch/lumberjack.v2"
 	"os"
 	"reflect"
 	"runtime"
@@ -23,6 +25,12 @@ import (
 
 const Version = "1.0.0-beta"
 
+type HookHandler interface {
+	HandleServerInfo(si []string)
+	HandleStructs(ctl *astp.Struct)
+	HandleParams(pf *astp.ParamField)
+}
+
 func New() *Server {
 	s := &Server{
 		Injector:   inject.New(),
@@ -31,15 +39,82 @@ func New() *Server {
 		option:     new(options.ServerOption),
 		parser:     astp.NewParser(),
 		middleware: NewMiddlewareContainer(),
-		logger:     &Logger{},
+		//logger:     logrus.StandardLogger(),
 	}
+	logger := logrus.New()
+	logger.SetOutput(os.Stdout)
+	logger.SetFormatter(Console())
+	logger.SetLevel(logrus.InfoLevel)
+
 	options.ReadConfig(s.option)
+	logger.SetLevel(logrus.Level(s.option.Logger.LoggerLevel))
+	dir := s.option.Logger.LogDir
+
+	if !s.option.Logger.RotateFile {
+		if s.option.Logger.SeparateLevelFile {
+
+			pathMap := PathMap{
+				logrus.InfoLevel:  dir + "/info.log",
+				logrus.ErrorLevel: dir + "/error.log",
+				logrus.DebugLevel: dir + "/debug.log",
+			}
+			logger.AddHook(NewFileHook(pathMap, Json()))
+		} else {
+			logger.AddHook(NewFileHook(dir+"/fw.log", Json()))
+		}
+	} else {
+		if s.option.Logger.SeparateLevelFile {
+			writerMap := WriterMap{
+				logrus.InfoLevel: &lumberjack.Logger{
+					Filename:   dir + "/info.log",
+					Compress:   s.option.Logger.Compress,
+					MaxSize:    s.option.Logger.MaxSize,
+					MaxAge:     s.option.Logger.MaxAge,
+					MaxBackups: s.option.Logger.MaxBackups,
+					LocalTime:  s.option.Logger.LocalTime,
+				},
+				logrus.ErrorLevel: &lumberjack.Logger{
+					Filename:   dir + "/error.log",
+					Compress:   s.option.Logger.Compress,
+					MaxSize:    s.option.Logger.MaxSize,
+					MaxAge:     s.option.Logger.MaxAge,
+					MaxBackups: s.option.Logger.MaxBackups,
+					LocalTime:  s.option.Logger.LocalTime,
+				},
+
+				logrus.DebugLevel: &lumberjack.Logger{
+					Filename:   dir + "/debug.log",
+					Compress:   s.option.Logger.Compress,
+					MaxSize:    s.option.Logger.MaxSize,
+					MaxAge:     s.option.Logger.MaxAge,
+					MaxBackups: s.option.Logger.MaxBackups,
+					LocalTime:  s.option.Logger.LocalTime,
+				},
+			}
+			logger.AddHook(NewFileHook(writerMap, Json()))
+		} else {
+
+			logger.AddHook(NewFileHook(&lumberjack.Logger{
+				Filename:   dir + "/fw.log",
+				Compress:   s.option.Logger.Compress,
+				MaxSize:    s.option.Logger.MaxSize,
+				MaxAge:     s.option.Logger.MaxAge,
+				MaxBackups: s.option.Logger.MaxBackups,
+				LocalTime:  s.option.Logger.LocalTime,
+			}, Json()))
+		}
+
+	}
+
+	s.logger = logger
+
 	if s.option.Debug {
 		bs, _ := json.MarshalIndent(s.option, "", "    ")
-		fmt.Println(string(bs))
+		s.logger.Debugln(conv.String(bs))
 	}
 
 	s.Map(s.option)
+	s.Map(s.logger)
 	s.Map(s)
 	if !internal.FileIsExist(s.option.AstFile) {
 		if s.option.Dev {
@@ -57,20 +132,26 @@ func New() *Server {
 
 	s.tw.SetRowLine(true)
 	s.tw.SetCenterSeparator("|")
+	s.tw.SetAutoMergeCellsByColumnIndex([]int{0})
 	return s
 }
 
 type Server struct {
 	inject.Injector
-	server     *fasthttp.Server
-	router     *router.Router
-	option     *options.ServerOption
-	parser     *astp.Parser
-	tw         *tablewriter.Table
-	middleware *MiddlewareContainer
-	logger     types.ILogger
-	once       sync.Once
-	midGlobals []IMiddlewareMethod
+	server      *fasthttp.Server
+	router      *router.Router
+	option      *options.ServerOption
+	parser      *astp.Parser
+	tw          *tablewriter.Table
+	middleware  *MiddlewareContainer
+	logger      *logrus.Logger
+	once        sync.Once
+	midGlobals  []IMiddlewareMethod
+	hookHandler HookHandler
+}
+
+func (s *Server) RegisterHooks(handler HookHandler) {
+	s.hookHandler = handler
 }
 
 type HandlerFunc = func(*Context)
@@ -91,14 +172,36 @@ func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 }
 
 func (s *Server) addRouteTable(a, b, c, d, e string) {
+	var fcolor = func(method string) []int {
+		switch method {
+		case "GET":
+			return tablewriter.Color(tablewriter.FgBlueColor)
+		case "POST":
+			return tablewriter.Color(tablewriter.FgCyanColor)
+		case "PUT":
+			return tablewriter.Color(tablewriter.FgYellowColor)
+		case "DELETE":
+			return tablewriter.Color(tablewriter.FgRedColor)
+		case "PATCH":
+			return tablewriter.Color(tablewriter.FgGreenColor)
+		case "HEAD":
+			return tablewriter.Color(tablewriter.FgMagentaColor)
+		case "OPTIONS":
+			return tablewriter.Color(tablewriter.FgWhiteColor)
+		case "WS":
+			return tablewriter.Color(tablewriter.FgCyanColor)
+		default:
+			return tablewriter.Color(tablewriter.Normal)
+		}
+	}
 	if s.option.NoColor {
 		s.tw.Append([]string{a, b, c, d, e})
 	} else {
 		s.tw.Rich([]string{a, b, c, d, e}, []tablewriter.Colors{
 			tablewriter.Color(tablewriter.FgBlueColor),
-			tablewriter.Color(tablewriter.FgGreenColor),
-			tablewriter.Color(tablewriter.FgHiWhiteColor),
-			tablewriter.Color(tablewriter.FgHiGreenColor),
+			fcolor(b),
+			tablewriter.Color(tablewriter.Normal),
+			tablewriter.Color(tablewriter.Normal),
 			tablewriter.Color(tablewriter.FgHiYellowColor)})
 	}
 }
@@ -130,9 +233,10 @@ func (s *Server) RegisterRoute(controller any) {
 		for _, item := range m0 {
 			s.midGlobals = append(s.midGlobals, item.Middleware)
 			if item.Path != "" {
+
 				s.registerRoute(item.Method, item.Path, item.H)
 				if !item.IsHide {
-					s.addRouteTable("Server", item.Method, item.Path, "Global", "@"+item.Middleware.Name())
+					s.addRouteTable("Global", item.Method, item.Path, "", "@"+item.Middleware.Name())
 				}
 
 			}
@@ -170,7 +274,9 @@ func (s *Server) RegisterRoute(controller any) {
 			}
 
 		}
-
+		if s.hookHandler != nil {
+			s.hookHandler.HandleStructs(ctl)
+		}
 		//处理控制器方法
 		for _, method := range ctl.Methods {
 			vm := refVal.MethodByName(method.Name)
@@ -189,12 +295,16 @@ func (s *Server) RegisterRoute(controller any) {
 				}
 			}
 			attrs, call1 := s.handle(method, mids)
-			sig := []string{}
+			sig := strings.Builder{}
 			for _, mid := range mids {
-				sig = append(sig, "@"+mid.Attribute())
+				sig.WriteString("@")
+				sig.WriteString(mid.Attribute())
+				sig.WriteRune(',')
 			}
 			for _, attr := range attrs {
-				sig = append(sig, "@"+attr)
+				sig.WriteString("@")
+				sig.WriteString(attr)
+				sig.WriteRune(',')
 			}
 
 			for i, hm := range hms {
@@ -203,7 +313,14 @@ func (s *Server) RegisterRoute(controller any) {
 					s.handleError(nil, err)
 					continue
 				}
-				s.addRouteTable(method.Receiver.TypeString, strings.ToUpper(hm), joinRoute(base, rps[i]), method.Name, strings.Join(sig, ","))
+				controllerName := method.Receiver.TypeString
+				route := joinRoute(base, rps[i])
+				if method.Receiver.TypeString != ctl.Name {
+					controllerName = ctl.Name
+					sig.WriteString("@")
+					sig.WriteString("inherit")
+				}
+				s.addRouteTable(controllerName, strings.ToUpper(hm), route, method.Name, sig.String())
 			}
 
 		}
@@ -255,6 +372,9 @@ func (s *Server) bind(c *Context, handler *astp.Method) {
 			if strings.ToLower(cmd.Name) == "service" || cmd.Name == "" {
 
 			} else {
+				if s.hookHandler != nil {
+					s.hookHandler.HandleParams(param)
+				}
 				// 对方法参数进行数据映射和校验
 				if err := binding.GetByAttr(cmd).Bind(c.GetFastContext(), body.Interface()); err != nil {
 					s.handleError(c, err)
@@ -337,7 +457,7 @@ func (s *Server) handleError(ctx *Context, err error) {
 
 func (s *Server) Run() error {
 	s.tw.Render()
-
+	//s.logger.Printf("fw server@%s serving at http://%s:%d%s", Version, s.option.Listen, s.option.Port, s.option.BasePath)
 	internal.OKf("fw server@%s serving at http://%s:%d%s", Version, s.option.Listen, s.option.Port, s.option.BasePath)
 	s.server.Handler = s.router.Handler
 	s.server.StreamRequestBody = true
@@ -356,5 +476,6 @@ func (s *Server) Run() error {
 // Use register middleware to server.
 // you can only use the @'Attribute' after register a middleware
 func (s *Server) Use(middleware IMiddleware) {
+	s.Apply(middleware)
 	s.middleware.Reg(middleware)
 }

@@ -12,7 +12,7 @@ type Data[T int | string] struct {
 }
 
 type ResponseRewriterMiddleware struct {
-	fw.MiddlewareGlobal
+	*fw.MiddlewareGlobal
 }
 
 func (s *ResponseRewriterMiddleware) CloneAsMethod() fw.IMiddlewareMethod {

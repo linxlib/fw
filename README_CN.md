@@ -6,33 +6,21 @@ framework 简称
 本来想直接使用net/http的，但是想到可能需要重新实现那些请求解析、路由什么的，
 最终还是选择了fasthttp
 
+希望成为一个代码还没怎么敲，诶~，写完编译了这样的框架
 
-## 开发过程中遇到的问题
+## 特性
 
-- `json-iterator/go` 在反序列化 `map[string]*File` 类似这样的结构时，
-会丢失数据，比如我遇到的就会丢失一个key。随后又试了 `goccy/go-json`，也是类似的情况，
-不知道是不是要特殊配置。还是先用自带的
+- 支持 @Attribute 形式的注释来注入中间件和注册路由
+- 支持参数的映射和注入, 减少全局变量的使用，不用写 Unmarshal(xxx) 和 Bind(xxx)
+- 方便编写和使用的中间件，写好Use一下，在需要的地方 @ 一下
+- 支持结构体的embedded写法
+
+更多特性请查看 github.com/linxlib/fw_example
+
+## 未来增加
+
+- 基于本框架完成一个admin管理后台
+- benchmark
+- ...
 
 
-
-
-## TODO List
-
-- [x] WebsocketHub 作为 控制器级别中间件
-- [x] RecoveryMiddleware 作为 全局中间件
-- [ ] 日志类
-- [x] 配置写出
-- [ ] Swagger
-- [ ] pprof middleware
-- [ ] WebLogMiddleware
-- [x] ServerDownMiddleware 作为全局中间件
-- [ ] ResponseRewriter 作为全局或ctl中间件
-- [x] CorsMiddleware 全局中间件
-- [x] ~~Crud 中间件~~ SimpleCrudController
-- [x] 数据库或者服务的注入
-- [ ] 运行为 系统服务 
-- [x] 开发模式
-- [ ] 检测代码自动重启功能
-- [ ] Grpc
-- [x] 泛型支持
-- [ ] AuthMiddleware 全局或ctl或method

@@ -3,16 +3,10 @@ package attribute
 import "github.com/linxlib/astp"
 
 var innerStructAttrNames = map[string]AttributeType{
-	"OpenApiDoc": TypeDoc,
-	"Inject":     TypeOther,
 	"Route":      TypeMiddleware,
 	"Controller": TypeTagger,
 	"Ctl":        TypeTagger,
 	"Base":       TypeTagger,
-
-	"Tag":        TypeDoc,
-	"Deprecated": TypeDoc,
-	"Ignore":     TypeDoc,
 
 	"Body":      TypeParam,
 	"Json":      TypeParam,

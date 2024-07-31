@@ -2,6 +2,12 @@ package fw
 
 import (
 	"encoding/xml"
+	"fmt"
+	"github.com/gookit/color"
+	"github.com/linxlib/conv"
+	"github.com/linxlib/fw/internal/json"
+	"github.com/sirupsen/logrus"
+	"reflect"
 	"strings"
 	"unicode"
 )
@@ -60,3 +66,68 @@ func joinRoute(base string, r string) string {
 	}
 	return result
 }
+func Stringify(v interface{}) string {
+	var ret string
+	if IsObject(v) || isMap(v) {
+		ret = marshal(v)
+	} else {
+		ret = fmt.Sprint(v)
+	}
+	return ret
+}
+func IsObject(v interface{}) bool {
+	return reflect.ValueOf(v).Kind() == reflect.Struct
+}
+func marshal(o interface{}) string {
+	str, ok := o.(string)
+	if ok {
+		return str
+	}
+	data, err := json.Marshal(o)
+	if err != nil {
+		return fmt.Sprint(o)
+	}
+	return string(data)
+}
+func unmarshal(data string, o interface{}) error {
+	return json.Unmarshal(conv.Bytes(data), o)
+}
+func marshalIndent(o interface{}) string {
+	str, ok := o.(string)
+	if ok {
+		return str
+	}
+	m, err := json.MarshalIndent(o, "", " ")
+	if err != nil {
+		return fmt.Sprint(o)
+	}
+	return string(m)
+}
+func isMap(v interface{}) bool {
+	_, isMap := v.(map[string]interface{})
+	_, isLogFields := v.(logrus.Fields)
+
+	return isMap || isLogFields
+}
+
+var (
+	white        = color.HiWhite.Render
+	red          = color.HiRed.Render
+	green        = color.HiGreen.Render
+	blue         = color.HiBlue.Render
+	darkBlue     = color.Blue.Render
+	cyan         = color.HiCyan.Render
+	gray         = color.Gray.Render
+	yellow       = color.HiYellow.Render
+	magenta      = color.HiMagenta.Render
+	lightmagenta = color.LightMagenta.Render
+	info         = color.Info.Render
+	note         = color.Note.Render
+	err          = color.Error.Render
+	danger       = color.Danger.Render
+	success      = color.Success.Render
+	warning      = color.Warn.Render
+	question     = color.Question.Render
+	primary      = color.Primary.Render
+	secondary    = color.Secondary.Render
+)
