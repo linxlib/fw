@@ -67,6 +67,7 @@ type Formatter struct {
 	UseDefaultCaption bool
 	/** if enabled, CustomCaption will be marshaled to json */
 	CustomCaptionPrettyPrint bool
+
 	/** if has value, it attached right before message(object). custom caption can be struct, string, whatever */
 	CustomCaption interface{}
 	/** do PrettyPrint for message(object) */
@@ -116,12 +117,11 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 		}
 	}
 
-	//if entry.HasCaller() {
-	//	caller := getCaller(entry.Caller)
-	//	fc := caller.Function
-	//	file := fmt.Sprintf("%s:%d", caller.File, caller.Line)
-	//	b.WriteString(prettierCaller(file, fc))
-	//}
+	if entry.HasCaller() {
+		fc := entry.Caller.Function
+		file := fmt.Sprintf("%s:%d", entry.Caller.File, entry.Caller.Line)
+		b.WriteString(prettierCaller(file, fc))
+	}
 
 	if f.CustomCaption != nil {
 		captionStr := ""

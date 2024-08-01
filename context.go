@@ -9,6 +9,7 @@ import (
 	"github.com/linxlib/inject"
 	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp"
+	"html/template"
 	"io"
 	"net/http"
 	"net/url"
@@ -277,6 +278,14 @@ func (c *Context) Protocol() string {
 }
 func (c *Context) HTML(code int, name string, obj any) {
 
+}
+func (c *Context) HTMLPure(code int, content string, obj any) {
+	tmpl, _ := template.New("html").Parse(content)
+	c.Render(code, render.HTML{
+		Template: tmpl,
+		Name:     "html",
+		Data:     obj,
+	})
 }
 
 // Stream sends a streaming response and returns a boolean

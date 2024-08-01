@@ -44,6 +44,7 @@ func New() *Server {
 	logger.SetOutput(os.Stdout)
 	logger.SetFormatter(Console())
 	logger.SetLevel(logrus.InfoLevel)
+	logger.SetReportCaller(true)
 
 	defer func() {
 		if err := recover(); err != nil {

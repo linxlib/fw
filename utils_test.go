@@ -76,6 +76,14 @@ func Test_joinRoute(t *testing.T) {
 			},
 			want: "/api/one",
 		},
+		{
+			name: "test9",
+			args: args{
+				base: "/",
+				r:    "/",
+			},
+			want: "/",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

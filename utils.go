@@ -56,7 +56,7 @@ func joinRoute(base string, r string) string {
 	var result = base
 	if r == "/" || r == "" {
 
-		if strings.HasSuffix(result, "/") {
+		if strings.HasSuffix(result, "/") && result != "/" {
 			result = strings.TrimSuffix(result, "/")
 			r = ""
 		} else {
