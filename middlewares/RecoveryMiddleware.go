@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -57,18 +58,31 @@ func (s *RecoveryMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
 				//		}
 				//	}
 				//}
-				stack := stack(3)
+				stack := stack(3, 12)
 				if s.Logger != nil {
 					//DUMP http request、headers etc.
+					reqStr := &strings.Builder{}
+					reqStr.WriteString(fmt.Sprintf("RemoteIP: %s\n", context.RemoteIP()))
+					reqStr.WriteString(fmt.Sprintf("Host: %s\n", context.GetFastContext().Host()))
+					reqStr.WriteString(fmt.Sprintf("Method: %s\n", context.Method()))
+					reqStr.WriteString(fmt.Sprintf("URI: %s\n", context.GetFastContext().RequestURI()))
+					reqStr.WriteString("Headers:\n")
+					context.GetFastContext().Request.Header.VisitAll(func(k, v []byte) {
+						reqStr.WriteString(fmt.Sprintf(" %s: %s\n", k, v))
+					})
+					reqStr.WriteString(fmt.Sprintf("Body: %s\n", context.GetFastContext().PostBody()))
+
 					if s.isDebug {
 						s.Logger.Printf(
-							"["+color.HiCyan.Render("Recovery")+"] panic recovered: %s\n"+color.HiYellow.Render("Stack Trace:")+"\n%s\n",
+							"["+color.HiCyan.Render("Recovery")+"] panic recovered: %s\n"+color.HiYellow.Render("Request:")+"\n%s"+color.HiYellow.Render("Stack Trace:")+"\n%s\n",
 							color.HiRed.Render(errMsg),
+							color.Blue.Render(reqStr.String()),
 							color.HiMagenta.Render(conv.String(stack)))
 					} else {
 						s.Logger.Printf(
-							"["+color.HiCyan.Render("Recovery")+"] panic recovered: %s\n",
-							color.HiRed.Render(errMsg))
+							"["+color.HiCyan.Render("Recovery")+"] panic recovered: %s\n%s",
+							color.HiRed.Render(errMsg),
+							color.Blue.Render(reqStr.String()))
 					}
 
 				}
@@ -92,7 +106,7 @@ func (s *RecoveryMiddleware) HandlerController(base string) *fw.RouteItem {
 const recoveryName = "Recovery"
 
 func NewRecoveryMiddleware(o *RecoveryOptions, logger *logrus.Logger) fw.IMiddlewareGlobal {
-	isDebug := os.Getenv("FW_DEBUG") == "true"
+	isDebug := os.Getenv("FW_DEBUG") == ""
 	return &RecoveryMiddleware{
 		MiddlewareGlobal: fw.NewMiddlewareGlobal(recoveryName),
 		options:          o,
@@ -109,19 +123,19 @@ var (
 )
 
 // stack returns a nicely formatted stack frame, skipping skip frames.
-func stack(skip int) []byte {
+func stack(skip int, max int) []byte {
 	buf := new(bytes.Buffer) // the returned data
 	// As we loop, we open files and read them. These variables record the currently
 	// loaded file.
 	var lines [][]byte
 	var lastFile string
-	for i := skip; ; i++ { // Skip the expected number of frames
+	for i := skip; i <= max; i++ { // Skip the expected number of frames
 		pc, file, line, ok := runtime.Caller(i)
 		if !ok {
 			break
 		}
 		// Print this much at least.  If we can't find the source, it won't show.
-		fmt.Fprintf(buf, "%s:%d (0x%x)\n", file, line, pc)
+		fmt.Fprintf(buf, "%s:%d (0x%X)\n", file, line, pc)
 		if file != lastFile {
 			data, err := os.ReadFile(file)
 			if err != nil {
