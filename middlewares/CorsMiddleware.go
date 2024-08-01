@@ -48,9 +48,9 @@ func (c *CorsMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
 	return NewCorsMiddleware(c.config)
 }
 
-func (c *CorsMiddleware) HandlerController(base string) *fw.RouteItem {
+func (c *CorsMiddleware) HandlerController(base string) []*fw.RouteItem {
 	cors := newCors(c.config)
-	return &fw.RouteItem{
+	return []*fw.RouteItem{&fw.RouteItem{
 		Method: "OPTIONS",
 		Path:   base + "/{all:*}",
 		IsHide: false,
@@ -58,7 +58,7 @@ func (c *CorsMiddleware) HandlerController(base string) *fw.RouteItem {
 			cors.applyCors(context)
 		},
 		Middleware: c,
-	}
+	}}
 }
 
 type converter func(string) string
@@ -465,7 +465,7 @@ func DefaultConfig() Config {
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type"},
 		AllowCredentials: false,
-		AllowAllOrigins: true,
+		AllowAllOrigins:  true,
 		MaxAge:           12 * time.Hour,
 	}
 }

@@ -48,7 +48,7 @@ func (w *WebsocketHubMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
 	return NewWebsocketHubMiddleware()
 }
 
-func (w *WebsocketHubMiddleware) HandlerController(h string) *fw.RouteItem {
+func (w *WebsocketHubMiddleware) HandlerController(h string) []*fw.RouteItem {
 
 	var p = w.GetParam()
 	values, err := url.ParseQuery(p)
@@ -61,7 +61,7 @@ func (w *WebsocketHubMiddleware) HandlerController(h string) *fw.RouteItem {
 		h = w.route
 	}
 
-	return &fw.RouteItem{
+	return []*fw.RouteItem{&fw.RouteItem{
 		Method:     "ANY",
 		Path:       h,
 		Middleware: w,
@@ -87,7 +87,7 @@ func (w *WebsocketHubMiddleware) HandlerController(h string) *fw.RouteItem {
 				return
 			}
 		},
-	}
+	}}
 }
 
 func (w *WebsocketHubMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {

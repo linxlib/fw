@@ -133,7 +133,7 @@ func (b *BasicAuthMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
 	return NewBasicAuthMiddleware()
 }
 
-func (b *BasicAuthMiddleware) HandlerController(base string) *fw.RouteItem {
+func (b *BasicAuthMiddleware) HandlerController(base string) []*fw.RouteItem {
 	return fw.EmptyRouteItem(b)
 }
 

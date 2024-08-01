@@ -26,7 +26,7 @@ func (w *LoggerMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
 	return NewLoggerMiddleware(w.Logger)
 }
 
-func (w *LoggerMiddleware) HandlerController(s string) *fw.RouteItem {
+func (w *LoggerMiddleware) HandlerController(s string) []*fw.RouteItem {
 	return fw.EmptyRouteItem(w)
 }
 

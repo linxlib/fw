@@ -98,7 +98,7 @@ func (s *RecoveryMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
 	return NewRecoveryMiddleware(s.options, s.Logger)
 }
 
-func (s *RecoveryMiddleware) HandlerController(base string) *fw.RouteItem {
+func (s *RecoveryMiddleware) HandlerController(base string) []*fw.RouteItem {
 
 	return fw.EmptyRouteItem(s)
 }

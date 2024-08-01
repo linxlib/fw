@@ -47,14 +47,14 @@ func (s *ResponseRewriterMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
 	return NewResponseRewriteMiddleware()
 }
 
-func (s *ResponseRewriterMiddleware) HandlerController(base string) *fw.RouteItem {
-	return &fw.RouteItem{
+func (s *ResponseRewriterMiddleware) HandlerController(base string) []*fw.RouteItem {
+	return []*fw.RouteItem{&fw.RouteItem{
 		Method:     "",
 		Path:       "",
 		IsHide:     false,
 		H:          nil,
 		Middleware: s,
-	}
+	}}
 }
 
 const responseRewriterName = "ResponseRewriter"

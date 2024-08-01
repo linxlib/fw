@@ -35,8 +35,8 @@ func (s *ServerDownMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
 	return NewServerDownMiddleware(s.key)
 }
 
-func (s *ServerDownMiddleware) HandlerController(s2 string) *fw.RouteItem {
-	return &fw.RouteItem{
+func (s *ServerDownMiddleware) HandlerController(s2 string) []*fw.RouteItem {
+	return []*fw.RouteItem{&fw.RouteItem{
 		Method: "PATCH",
 		Path:   "/serverDown/{key}",
 		IsHide: true,
@@ -49,7 +49,7 @@ func (s *ServerDownMiddleware) HandlerController(s2 string) *fw.RouteItem {
 			context.String(200, "ok")
 		},
 		Middleware: s,
-	}
+	}}
 }
 
 const serverDownName = "ServerDown"

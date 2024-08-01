@@ -33,8 +33,8 @@ type IMiddlewareCtl interface {
 	// CloneAsCtl returns a copy from Middleware Container
 	CloneAsCtl() IMiddlewareCtl
 	// HandlerController will be called when handling controller
-	// returns a RouteItem(field `Path` is not empty) if you want to register a route
-	HandlerController(base string) *RouteItem
+	// returns many RouteItem(field `Path` is not empty) if you want to register a route
+	HandlerController(base string) []*RouteItem
 }
 
 type IMiddlewareGlobal interface {
@@ -50,14 +50,14 @@ type RouteItem struct {
 }
 
 // EmptyRouteItem returns an empty RouteItem which won't register route
-func EmptyRouteItem(m IMiddlewareMethod) *RouteItem {
-	return &RouteItem{
+func EmptyRouteItem(m IMiddlewareMethod) []*RouteItem {
+	return []*RouteItem{{
 		Method:     "",
 		Path:       "",
 		IsHide:     false,
 		H:          nil,
 		Middleware: m,
-	}
+	}}
 }
 
 var _ IMiddleware = (*Middleware)(nil)

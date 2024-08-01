@@ -419,7 +419,7 @@ func (s *Server) handleGlobal(base string) []*RouteItem {
 		mid = mid.CloneAsCtl()
 		r := mid.HandlerController(base)
 		if r != nil {
-			result = append(result, r)
+			result = append(result, r...)
 		}
 
 		return false
@@ -437,7 +437,7 @@ func (s *Server) handleCtl(base string, ctl *astp.Struct) []*RouteItem {
 			mid.SetParam(attr.Value)
 			r := mid.HandlerController(base)
 			if r != nil {
-				result = append(result, r)
+				result = append(result, r...)
 			}
 
 		}
