@@ -14,16 +14,16 @@ const (
 func NewLoggerMiddleware(logger *logrus.Logger) fw.IMiddlewareGlobal {
 	return &LoggerMiddleware{
 		MiddlewareGlobal: fw.NewMiddlewareGlobal(loggerName),
-		logger:           logger}
+		Logger:           logger}
 }
 
 type LoggerMiddleware struct {
 	*fw.MiddlewareGlobal
-	logger *logrus.Logger `inject:""`
+	Logger *logrus.Logger `inject:""`
 }
 
 func (w *LoggerMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewLoggerMiddleware(w.logger)
+	return NewLoggerMiddleware(w.Logger)
 }
 
 func (w *LoggerMiddleware) HandlerController(s string) *fw.RouteItem {
@@ -56,7 +56,7 @@ func (w *LoggerMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
 			params.ErrorMessage = "\nErr:" + err.(error).Error()
 		}
 
-		w.logger.Printf("|%3s| %18s | %15s | %-7s %s %s%s",
+		w.Logger.Printf("|%3s| %18s | %15s | %-7s %s %s%s",
 			params.StatusCodeWithColor(),
 			params.LatencyWithColor(),
 			params.ClientIPWithColor(),

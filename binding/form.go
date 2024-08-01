@@ -57,7 +57,8 @@ func (formMultipartBinding) Bind(req *fasthttp.RequestCtx, obj any) error {
 	if err != nil {
 		return err
 	}
-	if err := mapForm(obj, mform.Value); err != nil {
+
+	if err := mappingByPtr(obj, (*multipartRequest)(mform), "multipart"); err != nil {
 		return err
 	}
 

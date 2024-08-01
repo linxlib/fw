@@ -86,7 +86,7 @@ const (
 func NewLogMiddleware(logger *logrus.Logger) fw.IMiddlewareCtl {
 	return &LogMiddleware{
 		MiddlewareCtl: fw.NewMiddlewareCtl(logName, logAttr),
-		logger:        logger,
+		Logger:        logger,
 	}
 }
 
@@ -95,13 +95,13 @@ func NewLogMiddleware(logger *logrus.Logger) fw.IMiddlewareCtl {
 // can be used on Controller or Method
 type LogMiddleware struct {
 	*fw.MiddlewareCtl
-	logger *logrus.Logger `inject:""`
+	Logger *logrus.Logger `inject:""`
 	// real_ip_header=CF-Connecting-IP
 	realIPHeader string
 }
 
 func (w *LogMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewLogMiddleware(w.logger)
+	return NewLogMiddleware(w.Logger)
 }
 
 func (w *LogMiddleware) HandlerController(s string) *fw.RouteItem {
@@ -141,7 +141,7 @@ func (w *LogMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
 			params.ErrorMessage = "\nErr:" + err.(error).Error()
 		}
 
-		w.logger.Printf("|%3s| %18s | %15s | %-7s %s %s%s",
+		w.Logger.Printf("|%3s| %18s | %15s | %-7s %s %s%s",
 			params.StatusCodeWithColor(),
 			params.LatencyWithColor(),
 			params.ClientIPWithColor(),

@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/natefinch/lumberjack.v2"
+	"log"
 	"os"
 	"reflect"
 	"runtime"
@@ -268,6 +269,7 @@ func (s *Server) RegisterRoute(controller any) {
 
 		//处理控制器
 		m := s.handleCtl(base, ctl)
+
 		mids := make([]IMiddlewareMethod, 0)
 
 		for _, item := range m {
@@ -298,13 +300,17 @@ func (s *Server) RegisterRoute(controller any) {
 
 			var hms = make([]string, 0)
 			var rps = make([]string, 0)
+			var toIgnore string
 			for _, command := range attribute.GetMethodAttributes(method) {
 				if command.Type == attribute.TypeHttpMethod {
 					hms = append(hms, command.Name)
 					rps = append(rps, command.Value)
+				} else if command.Name == "Ignore" && command.Value != "" {
+					//处理忽略
+					toIgnore = command.Value
 				}
 			}
-			attrs, call1 := s.handle(method, mids)
+			attrs, call1 := s.handle(method, mids, toIgnore)
 			sig := strings.Builder{}
 			for _, mid := range mids {
 				sig.WriteString("@")
@@ -438,7 +444,7 @@ func (s *Server) handleCtl(base string, ctl *astp.Struct) []*RouteItem {
 	return result
 }
 
-func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod) ([]string, HandlerFunc) {
+func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod, toIgnore string) ([]string, HandlerFunc) {
 	//先把实际的方法wrap成HandlerFunc
 	next := s.wrapM(handler)
 	// 先处理method上的中间件
@@ -455,6 +461,10 @@ func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod) ([]strin
 	}
 	// 然后处理controller上的中间件
 	for _, mid := range mids {
+		// 如果方法上打了 @Ignore Auth 则需要忽略 Auth这个代表 AuthMiddleware 的中间件
+		if toIgnore == mid.Attribute() {
+			continue
+		}
 		next = mid.HandlerMethod(next)
 	}
 	// 这里全局的中间件 仅针对于方法，不会对Controller做出改变
@@ -489,6 +499,9 @@ func (s *Server) Run() error {
 // Use register middleware to server.
 // you can only use the @'Attribute' after register a middleware
 func (s *Server) Use(middleware IMiddleware) {
-	_ = s.Apply(middleware)
+	err := s.Apply(middleware)
+	if err != nil {
+		log.Println(err)
+	}
 	s.middleware.Reg(middleware)
 }

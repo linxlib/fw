@@ -465,6 +465,7 @@ func DefaultConfig() Config {
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type"},
 		AllowCredentials: false,
+		AllowAllOrigins: true,
 		MaxAge:           12 * time.Hour,
 	}
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/gookit/color"
 	"github.com/linxlib/conv"
 	"github.com/linxlib/fw"
-	"io"
+	"github.com/sirupsen/logrus"
 	"os"
 	"runtime"
 	"time"
@@ -21,14 +21,13 @@ type RecoveryOptions struct {
 	// whether output to console
 	// won't output stack trace to console unless the environment FW_DEBUG=true
 	Console bool
-	// writer. just use logger's output
-	Output io.Writer
 }
 
 // RecoveryMiddleware globally recover from panic
 type RecoveryMiddleware struct {
 	*fw.MiddlewareGlobal
 	options *RecoveryOptions
+	Logger  *logrus.Logger `inject:""`
 	isDebug bool
 }
 
@@ -59,20 +58,21 @@ func (s *RecoveryMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
 				//	}
 				//}
 				stack := stack(3)
-				if s.options.Output != nil {
+				if s.Logger != nil {
 					//DUMP http request、headers etc.
 					if s.isDebug {
-						color.Fprintf(s.options.Output,
+						s.Logger.Printf(
 							"["+color.HiCyan.Render("Recovery")+"] panic recovered: %s\n"+color.HiYellow.Render("Stack Trace:")+"\n%s\n",
 							color.HiRed.Render(errMsg),
 							color.HiMagenta.Render(conv.String(stack)))
 					} else {
-						color.Fprintf(s.options.Output,
+						s.Logger.Printf(
 							"["+color.HiCyan.Render("Recovery")+"] panic recovered: %s\n",
 							color.HiRed.Render(errMsg))
 					}
 
 				}
+				context.String(500, errMsg)
 
 			}
 		}()
@@ -81,7 +81,7 @@ func (s *RecoveryMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
 }
 
 func (s *RecoveryMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewRecoveryMiddleware(s.options)
+	return NewRecoveryMiddleware(s.options, s.Logger)
 }
 
 func (s *RecoveryMiddleware) HandlerController(base string) *fw.RouteItem {
@@ -91,12 +91,13 @@ func (s *RecoveryMiddleware) HandlerController(base string) *fw.RouteItem {
 
 const recoveryName = "Recovery"
 
-func NewRecoveryMiddleware(o *RecoveryOptions) fw.IMiddlewareGlobal {
+func NewRecoveryMiddleware(o *RecoveryOptions, logger *logrus.Logger) fw.IMiddlewareGlobal {
 	isDebug := os.Getenv("FW_DEBUG") == "true"
 	return &RecoveryMiddleware{
 		MiddlewareGlobal: fw.NewMiddlewareGlobal(recoveryName),
 		options:          o,
 		isDebug:          isDebug,
+		Logger:           logger,
 	}
 }
 
