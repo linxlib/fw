@@ -117,7 +117,7 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 		}
 	}
 
-	if entry.HasCaller() {
+	if entry.HasCaller() && entry.Level <= logrus.ErrorLevel {
 		fc := entry.Caller.Function
 		file := fmt.Sprintf("%s:%d", entry.Caller.File, entry.Caller.Line)
 		b.WriteString(prettierCaller(file, fc))
