@@ -1,6 +1,6 @@
 package json
 
-import json "github.com/json-iterator/go"
+import json "encoding/json"
 
 var (
 	// Marshal is exported by gin/json package.
