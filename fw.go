@@ -334,8 +334,7 @@ func (s *Server) RegisterRoute(controller any) {
 				route := joinRoute(base, rps[i])
 				if method.Receiver.TypeString != ctl.Name {
 					controllerName = ctl.Name
-					sig.WriteString("@")
-					sig.WriteString("inherit")
+					sig.WriteString("@inherit")
 				}
 				s.addRouteTable(controllerName, strings.ToUpper(hm), route, method.Name, sig.String())
 			}
