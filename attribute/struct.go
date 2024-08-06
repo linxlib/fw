@@ -20,13 +20,13 @@ var innerStructAttrNames = map[string]AttributeType{
 	"Service":   TypeParam,
 	"Plain":     TypeParam,
 }
-var cmdStructCaches = make(map[*astp.Struct][]*Attribute)
+var cmdStructCaches = make(map[*astp.Element][]*Attribute)
 
 func AddStructAttributeType(name string, t AttributeType) {
 	innerStructAttrNames[name] = t
 }
 
-func GetStructAttrs(s *astp.Struct) []*Attribute {
+func GetStructAttrs(s *astp.Element) []*Attribute {
 	if cmdCache, ok := cmdStructCaches[s]; ok {
 		return cmdCache
 	}
@@ -35,7 +35,7 @@ func GetStructAttrs(s *astp.Struct) []*Attribute {
 	return cmdCache
 }
 
-func HasAttribute(s *astp.Struct, name string) bool {
+func HasAttribute(s *astp.Element, name string) bool {
 	if cmdCache, ok := cmdStructCaches[s]; ok {
 		for _, cmd := range cmdCache {
 			if cmd.Name == name {
@@ -51,7 +51,7 @@ func HasAttribute(s *astp.Struct, name string) bool {
 	}
 	return false
 }
-func GetStructAttrByName(s *astp.Struct, name string) *Attribute {
+func GetStructAttrByName(s *astp.Element, name string) *Attribute {
 	if cmdCache, ok := cmdStructCaches[s]; ok {
 		for _, cmd := range cmdCache {
 			if cmd.Name == name {
@@ -68,7 +68,7 @@ func GetStructAttrByName(s *astp.Struct, name string) *Attribute {
 	return nil
 }
 
-func GetStructAttrAsMiddleware(s *astp.Struct) []*Attribute {
+func GetStructAttrAsMiddleware(s *astp.Element) []*Attribute {
 	results := make([]*Attribute, 0)
 	attrs := GetStructAttrs(s)
 	for _, attr := range attrs {

@@ -19,9 +19,9 @@ func AddMethodAttributeType(name string, typ AttributeType) {
 	innerAttrNames[name] = typ
 }
 
-var attrMethodCaches = make(map[*astp.Method][]*Attribute)
+var attrMethodCaches = make(map[*astp.Element][]*Attribute)
 
-func GetMethodAttributes(m *astp.Method) []*Attribute {
+func GetMethodAttributes(m *astp.Element) []*Attribute {
 	if cmdCache, ok := attrMethodCaches[m]; ok {
 		return cmdCache
 	}
@@ -30,7 +30,7 @@ func GetMethodAttributes(m *astp.Method) []*Attribute {
 	return cmdCache
 }
 
-func GetMethodAttributesAsMiddleware(m *astp.Method) []*Attribute {
+func GetMethodAttributesAsMiddleware(m *astp.Element) []*Attribute {
 	results := make([]*Attribute, 0)
 	attrs := GetMethodAttributes(m)
 	for _, attr := range attrs {

@@ -26,8 +26,8 @@ const Version = "1.0.0-beta"
 
 type HookHandler interface {
 	HandleServerInfo(si []string)
-	HandleStructs(ctl *astp.Struct)
-	HandleParams(pf *astp.ParamField)
+	HandleStructs(ctl *astp.Element)
+	HandleParams(pf *astp.Element)
 }
 
 func New() *Server {
@@ -252,11 +252,10 @@ func (s *Server) RegisterRoute(controller any) {
 	})
 
 	// 遍历代码中所有的 @Controller 标记的结构，按照控制器对待
-	s.parser.VisitAllStructs(typ.Name(), func(ctl *astp.Struct) bool {
+	s.parser.VisitStruct(func(element *astp.Element) bool {
+		return element.Name == typ.Name() && attribute.HasAttribute(element, controllerAttr)
+	}, func(ctl *astp.Element) {
 
-		if !attribute.HasAttribute(ctl, controllerAttr) {
-			return false
-		}
 		// 第一层路由 【配置文件】
 		base := s.option.BasePath
 		if base == "" {
@@ -278,7 +277,6 @@ func (s *Server) RegisterRoute(controller any) {
 			if item.Path != "" {
 				err := s.registerRoute(item.Method, item.Path, item.H)
 				if err != nil {
-					s.handleError(err)
 					continue
 				}
 				if !item.IsHide {
@@ -291,13 +289,16 @@ func (s *Server) RegisterRoute(controller any) {
 			s.hookHandler.HandleStructs(ctl)
 		}
 		//处理控制器方法
-		for _, method := range ctl.Methods {
+		ctl.VisitElements(astp.ElementMethod, func(element *astp.Element) bool {
+			return !element.Private()
+		}, func(method *astp.Element) {
 			vm := refVal.MethodByName(method.Name)
 			vmt := reflect.TypeOf(vm.Interface())
-			for _, param := range method.Params {
+
+			method.VisitElementsAll(astp.ElementParam, func(param *astp.Element) {
 				param.SetRType(vmt.In(param.Index))
-			}
-			method.SetMethod(vm.Interface())
+			})
+			method.SetValue(vm.Interface())
 
 			var hms = make([]string, 0)
 			var rps = make([]string, 0)
@@ -327,20 +328,23 @@ func (s *Server) RegisterRoute(controller any) {
 			for i, hm := range hms {
 				err := s.registerRoute(strings.ToUpper(hm), joinRoute(base, rps[i]), call1)
 				if err != nil {
-					s.handleError(err)
 					continue
 				}
-				controllerName := method.Receiver.TypeString
-				route := joinRoute(base, rps[i])
-				if method.Receiver.TypeString != ctl.Name {
-					controllerName = ctl.Name
-					sig.WriteString("@inherit")
+				receiver := method.MustGetElement(astp.ElementReceiver)
+				if receiver != nil {
+					controllerName := receiver.TypeString
+					route := joinRoute(base, rps[i])
+					if receiver.TypeString != ctl.Name {
+						controllerName = ctl.Name
+						sig.WriteString("@inherit")
+					}
+					s.addRouteTable(controllerName, strings.ToUpper(hm), route, method.Name, sig.String())
 				}
-				s.addRouteTable(controllerName, strings.ToUpper(hm), route, method.Name, sig.String())
+
 			}
 
-		}
-		return false
+		})
+
 	})
 }
 
@@ -371,9 +375,10 @@ func (s *Server) registerRoute(method string, path string, f HandlerFunc) error 
 	return nil
 }
 
-func (s *Server) bind(c *Context, handler *astp.Method) {
+func (s *Server) bind(c *Context, handler *astp.Element) error {
 	// 准备调用方法需要的参数值
-	for _, param := range handler.Params {
+	params := handler.ElementsAll(astp.ElementParam)
+	for _, param := range params {
 		if param.GetRType().AssignableTo(reflect.TypeOf(c)) {
 			c.Map(c)
 			continue
@@ -393,19 +398,23 @@ func (s *Server) bind(c *Context, handler *astp.Method) {
 				}
 				// 对方法参数进行数据映射和校验
 				if err := binding.GetByAttr(cmd).Bind(c.GetFastContext(), body.Interface()); err != nil {
-					s.handleError(err)
+					return err
 				}
 			}
 			c.Map(body.Interface())
 		}
-
 	}
+	return nil
 }
 
-func (s *Server) wrapM(handler *astp.Method) HandlerFunc {
+func (s *Server) wrapM(handler *astp.Element) HandlerFunc {
 	return func(context *Context) {
-		s.bind(context, handler)
-		_, err := context.Injector().Invoke(handler.GetMethod())
+		var err error
+		err = s.bind(context, handler)
+		if err != nil {
+			panic(err)
+		}
+		_, err = context.Injector().Invoke(handler.GetValue())
 		if err != nil {
 			panic(err)
 		}
@@ -426,7 +435,7 @@ func (s *Server) handleGlobal(base string) []*RouteItem {
 	return result
 }
 
-func (s *Server) handleCtl(base string, ctl *astp.Struct) []*RouteItem {
+func (s *Server) handleCtl(base string, ctl *astp.Element) []*RouteItem {
 	result := make([]*RouteItem, 0)
 	attrs1 := attribute.GetStructAttrAsMiddleware(ctl)
 	for _, attr := range attrs1 {
@@ -444,7 +453,7 @@ func (s *Server) handleCtl(base string, ctl *astp.Struct) []*RouteItem {
 	return result
 }
 
-func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod, toIgnore string) ([]string, HandlerFunc) {
+func (s *Server) handle(handler *astp.Element, mids []IMiddlewareMethod, toIgnore string) ([]string, HandlerFunc) {
 	//先把实际的方法wrap成HandlerFunc
 	next := s.wrapM(handler)
 	// 先处理method上的中间件
@@ -472,10 +481,6 @@ func (s *Server) handle(handler *astp.Method, mids []IMiddlewareMethod, toIgnore
 		next = global.HandlerMethod(next)
 	}
 	return attrs1, next
-}
-
-func (s *Server) handleError(err error) {
-
 }
 
 func (s *Server) Run() error {

@@ -2,10 +2,10 @@ package attribute
 
 import "github.com/linxlib/astp"
 
-func GetFieldAttributeAsParamType(f *astp.ParamField) []*Attribute {
+func GetFieldAttributeAsParamType(f *astp.Element) []*Attribute {
 	results := make([]*Attribute, 0)
-	if f.Type != nil {
-		attrs := GetStructAttrs(f.Type)
+	if f.Item != nil {
+		attrs := GetStructAttrs(f.Item)
 		for _, attr := range attrs {
 			if attr.Type == TypeParam {
 				results = append(results, attr)
@@ -22,7 +22,7 @@ func GetFieldAttributeAsParamType(f *astp.ParamField) []*Attribute {
 	return results
 }
 
-func GetLastAttr(f *astp.ParamField) *Attribute {
+func GetLastAttr(f *astp.Element) *Attribute {
 	as := GetFieldAttributeAsParamType(f)
 	return as[len(as)-1]
 }
