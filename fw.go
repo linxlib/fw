@@ -3,13 +3,13 @@ package fw
 import (
 	"fmt"
 	"github.com/fasthttp/router"
+	"github.com/gookit/color"
 	"github.com/linxlib/astp"
 	"github.com/linxlib/fw/attribute"
 	"github.com/linxlib/fw/binding"
 	"github.com/linxlib/fw/internal"
 	"github.com/linxlib/fw/options"
 	"github.com/linxlib/inject"
-	"github.com/olekukonko/tablewriter"
 	"github.com/pterm/pterm"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
@@ -33,13 +33,12 @@ type HookHandler interface {
 
 func New() *Server {
 	s := &Server{
-		Injector:   inject.New(),
-		router:     router.New(),
-		server:     &fasthttp.Server{},
-		option:     new(options.ServerOption),
-		parser:     astp.NewParser(),
-		middleware: NewMiddlewareContainer(),
-		//logger:     logrus.StandardLogger(),
+		Injector:           inject.New(),
+		router:             router.New(),
+		server:             &fasthttp.Server{},
+		option:             new(options.ServerOption),
+		parser:             astp.NewParser(),
+		middleware:         NewMiddlewareContainer(),
 		routerTreeForPrint: make(map[string][][2]string),
 	}
 	pterm.DefaultHeader.WithBackgroundStyle(pterm.NewStyle(pterm.BgBlack)).WithFullWidth().Println("FW for golang developers")
@@ -131,12 +130,6 @@ func New() *Server {
 	}
 
 	s.parser.Load(s.option.AstFile)
-	s.tw = tablewriter.NewWriter(os.Stdout)
-	s.tw.SetHeader([]string{"Controller", "Method", "Route", "Method", "Signature"})
-
-	s.tw.SetRowLine(true)
-	s.tw.SetCenterSeparator("|")
-	s.tw.SetAutoMergeCellsByColumnIndex([]int{0})
 	return s
 }
 
@@ -146,7 +139,6 @@ type Server struct {
 	router             *router.Router
 	option             *options.ServerOption
 	parser             *astp.Parser
-	tw                 *tablewriter.Table
 	middleware         *MiddlewareContainer
 	logger             *logrus.Logger
 	once               sync.Once
@@ -176,50 +168,39 @@ func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 }
 
 func (s *Server) addRouteTable(a, b, c, d, e string) {
+	var fcolor1 = func(method string) string {
+		switch method {
+		case "GET":
+			return color.Blue.Sprint(method)
+		case "POST":
+			return color.Cyan.Sprint(method)
+		case "PUT":
+			return color.Yellow.Sprint(method)
+		case "DELETE":
+			return color.Red.Sprint(method)
+		case "PATCH":
+			return color.Green.Sprint(method)
+		case "HEAD":
+			return color.Magenta.Sprint(method)
+		case "OPTIONS":
+			return color.White.Sprint(method)
+		default:
+			return color.Normal.Sprint(method)
+		}
+	}
+	a = color.Magenta.Sprint(a)
 	if v, ok := s.routerTreeForPrint[a]; ok {
 		var temp [2]string
-		temp[0] = e
-		temp[1] = fmt.Sprintf("%s %s -> %s", b, c, d)
+		temp[0] = color.HiYellow.Sprint(e)
+		temp[1] = fmt.Sprintf("%s %s -> %s", fcolor1(b), c, color.HiGreen.Sprint(d))
 		v = append(v, temp)
 		s.routerTreeForPrint[a] = v
 	} else {
 		s.routerTreeForPrint[a] = make([][2]string, 0)
 		var temp [2]string
-		temp[0] = e
-		temp[1] = fmt.Sprintf("%s %s -> %s", b, c, d)
+		temp[0] = color.HiYellow.Sprint(e)
+		temp[1] = fmt.Sprintf("%s %s -> %s", fcolor1(b), c, color.HiGreen.Sprint(d))
 		s.routerTreeForPrint[a] = append(s.routerTreeForPrint[a], temp)
-	}
-	var fcolor = func(method string) []int {
-		switch method {
-		case "GET":
-			return tablewriter.Color(tablewriter.FgBlueColor)
-		case "POST":
-			return tablewriter.Color(tablewriter.FgCyanColor)
-		case "PUT":
-			return tablewriter.Color(tablewriter.FgYellowColor)
-		case "DELETE":
-			return tablewriter.Color(tablewriter.FgRedColor)
-		case "PATCH":
-			return tablewriter.Color(tablewriter.FgGreenColor)
-		case "HEAD":
-			return tablewriter.Color(tablewriter.FgMagentaColor)
-		case "OPTIONS":
-			return tablewriter.Color(tablewriter.FgWhiteColor)
-		case "WS":
-			return tablewriter.Color(tablewriter.FgCyanColor)
-		default:
-			return tablewriter.Color(tablewriter.Normal)
-		}
-	}
-	if s.option.NoColor {
-		s.tw.Append([]string{a, b, c, d, e})
-	} else {
-		s.tw.Rich([]string{a, b, c, d, e}, []tablewriter.Colors{
-			tablewriter.Color(tablewriter.FgBlueColor),
-			fcolor(b),
-			tablewriter.Color(tablewriter.Normal),
-			tablewriter.Color(tablewriter.Normal),
-			tablewriter.Color(tablewriter.FgHiYellowColor)})
 	}
 }
 
@@ -510,9 +491,8 @@ func (s *Server) handle(handler *astp.Element, mids []IMiddlewareMethod, toIgnor
 }
 
 func (s *Server) Run() error {
-	s.tw.Render()
-	var node pterm.TreeNode = pterm.TreeNode{
-		Text: "Server",
+	var node = pterm.TreeNode{
+		Text: "FW Server",
 	}
 
 	for s2, i := range s.routerTreeForPrint {
@@ -528,8 +508,6 @@ func (s *Server) Run() error {
 		node.Children = append(node.Children, no)
 	}
 	pterm.DefaultTree.WithRoot(node).Render()
-
-	//s.logger.Printf("fw server@%s serving at http://%s:%d%s", Version, s.option.Listen, s.option.Port, s.option.BasePath)
 	internal.OKf("fw server@%s serving at http://%s:%d%s", Version, s.option.Listen, s.option.Port, s.option.BasePath)
 	s.server.Handler = s.router.Handler
 	s.server.StreamRequestBody = true

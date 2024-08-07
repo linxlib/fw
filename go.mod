@@ -12,7 +12,6 @@ require (
 	github.com/linxlib/astp v0.0.0-00010101000000-000000000000
 	github.com/linxlib/conv v1.1.1
 	github.com/linxlib/inject v0.1.3
-	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pterm/pterm v0.12.79
 	github.com/sirupsen/logrus v1.9.3
 	github.com/valyala/bytebufferpool v1.0.0
