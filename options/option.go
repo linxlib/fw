@@ -36,6 +36,7 @@ func ReadConfig(o *ServerOption) {
 	o.intranetIP = getIntranetIP()
 	err := configor.New(&configor.Config{
 		AutoReload: true,
+		Silent:     true,
 		ENVPrefix:  "FW",
 	}).Load(o, "config/config.yaml")
 	if err != nil {

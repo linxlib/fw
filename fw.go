@@ -10,6 +10,7 @@ import (
 	"github.com/linxlib/fw/options"
 	"github.com/linxlib/inject"
 	"github.com/olekukonko/tablewriter"
+	"github.com/pterm/pterm"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -39,7 +40,9 @@ func New() *Server {
 		parser:     astp.NewParser(),
 		middleware: NewMiddlewareContainer(),
 		//logger:     logrus.StandardLogger(),
+		routerTreeForPrint: make(map[string][][2]string),
 	}
+	pterm.DefaultHeader.WithBackgroundStyle(pterm.NewStyle(pterm.BgBlack)).WithFullWidth().Println("FW for golang developers")
 	logger := logrus.New()
 	logger.SetOutput(os.Stdout)
 	logger.SetFormatter(Console())
@@ -139,16 +142,17 @@ func New() *Server {
 
 type Server struct {
 	inject.Injector
-	server      *fasthttp.Server
-	router      *router.Router
-	option      *options.ServerOption
-	parser      *astp.Parser
-	tw          *tablewriter.Table
-	middleware  *MiddlewareContainer
-	logger      *logrus.Logger
-	once        sync.Once
-	midGlobals  []IMiddlewareMethod
-	hookHandler HookHandler
+	server             *fasthttp.Server
+	router             *router.Router
+	option             *options.ServerOption
+	parser             *astp.Parser
+	tw                 *tablewriter.Table
+	middleware         *MiddlewareContainer
+	logger             *logrus.Logger
+	once               sync.Once
+	midGlobals         []IMiddlewareMethod
+	hookHandler        HookHandler
+	routerTreeForPrint map[string][][2]string
 }
 
 func (s *Server) RegisterHooks(handler HookHandler) {
@@ -172,6 +176,19 @@ func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 }
 
 func (s *Server) addRouteTable(a, b, c, d, e string) {
+	if v, ok := s.routerTreeForPrint[a]; ok {
+		var temp [2]string
+		temp[0] = e
+		temp[1] = fmt.Sprintf("%s %s -> %s", b, c, d)
+		v = append(v, temp)
+		s.routerTreeForPrint[a] = v
+	} else {
+		s.routerTreeForPrint[a] = make([][2]string, 0)
+		var temp [2]string
+		temp[0] = e
+		temp[1] = fmt.Sprintf("%s %s -> %s", b, c, d)
+		s.routerTreeForPrint[a] = append(s.routerTreeForPrint[a], temp)
+	}
 	var fcolor = func(method string) []int {
 		switch method {
 		case "GET":
@@ -266,7 +283,9 @@ func (s *Server) RegisterRoute(controller any) {
 		if r := attribute.GetStructAttrByName(ctl, controllerRoute); r != nil {
 			base = joinRoute(base, r.Value)
 		}
-
+		ctl.SetRValue(refVal)
+		ctl.SetValue(refVal.Interface())
+		ctl.SetRType(typ)
 		//处理控制器
 		m := s.handleCtl(base, ctl)
 
@@ -298,8 +317,8 @@ func (s *Server) RegisterRoute(controller any) {
 			method.VisitElementsAll(astp.ElementParam, func(param *astp.Element) {
 				param.SetRType(vmt.In(param.Index))
 			})
+			method.SetRValue(vm)
 			method.SetValue(vm.Interface())
-
 			var hms = make([]string, 0)
 			var rps = make([]string, 0)
 			var toIgnore string
@@ -383,19 +402,21 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 			c.Map(c)
 			continue
 		}
-		//TODO: 是否要兼容 非指针方式声明的参数
-		body := reflect.New(param.GetRType().Elem())
+
 		//TODO: 根据请求方法和contentType进行binding
 		cmd := attribute.GetLastAttr(param)
 		if cmd.Type == attribute.TypeInner {
 
 		} else {
+			//TODO: 是否要兼容 非指针方式声明的参数
+			body := reflect.New(param.GetRType().Elem())
 			if strings.ToLower(cmd.Name) == "service" || cmd.Name == "" {
 
 			} else {
 				if s.hookHandler != nil {
 					s.hookHandler.HandleParams(param)
 				}
+
 				// 对方法参数进行数据映射和校验
 				if err := binding.GetByAttr(cmd).Bind(c.GetFastContext(), body.Interface()); err != nil {
 					return err
@@ -404,6 +425,7 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 			c.Map(body.Interface())
 		}
 	}
+
 	return nil
 }
 
@@ -414,7 +436,7 @@ func (s *Server) wrapM(handler *astp.Element) HandlerFunc {
 		if err != nil {
 			panic(err)
 		}
-		_, err = context.Injector().Invoke(handler.GetValue())
+		_, err = context.Invoke(handler.GetValue())
 		if err != nil {
 			panic(err)
 		}
@@ -443,6 +465,7 @@ func (s *Server) handleCtl(base string, ctl *astp.Element) []*RouteItem {
 			// 拷贝一份 表示这份实例唯此控制器独享
 			mid = mid.CloneAsCtl()
 			mid.SetParam(attr.Value)
+			mid.SetCtlRValue(ctl.GetRValue())
 			r := mid.HandlerController(base)
 			if r != nil {
 				result = append(result, r...)
@@ -465,13 +488,16 @@ func (s *Server) handle(handler *astp.Element, mids []IMiddlewareMethod, toIgnor
 			// 拷贝一份副本 让中间件对于此上下文唯一
 			mid = mid.CloneAsMethod()
 			mid.SetParam(attr.Value)
+			mid.SetMethodRValue(handler.GetRValue())
 			next = mid.HandlerMethod(next)
 		}
 	}
 	// 然后处理controller上的中间件
 	for _, mid := range mids {
+		mid.SetMethodRValue(handler.GetRValue())
 		// 如果方法上打了 @Ignore Auth 则需要忽略 Auth这个代表 AuthMiddleware 的中间件
 		if toIgnore == mid.Attribute() {
+			next = mid.HandlerIgnored(next)
 			continue
 		}
 		next = mid.HandlerMethod(next)
@@ -485,6 +511,24 @@ func (s *Server) handle(handler *astp.Element, mids []IMiddlewareMethod, toIgnor
 
 func (s *Server) Run() error {
 	s.tw.Render()
+	var node pterm.TreeNode = pterm.TreeNode{
+		Text: "Server",
+	}
+
+	for s2, i := range s.routerTreeForPrint {
+		no := pterm.TreeNode{
+			Text: s2,
+		}
+		for _, i3 := range i {
+			no.Children = append(no.Children,
+				pterm.TreeNode{
+					Text: i3[1] + " " + i3[0],
+				})
+		}
+		node.Children = append(node.Children, no)
+	}
+	pterm.DefaultTree.WithRoot(node).Render()
+
 	//s.logger.Printf("fw server@%s serving at http://%s:%d%s", Version, s.option.Listen, s.option.Port, s.option.BasePath)
 	internal.OKf("fw server@%s serving at http://%s:%d%s", Version, s.option.Listen, s.option.Port, s.option.BasePath)
 	s.server.Handler = s.router.Handler

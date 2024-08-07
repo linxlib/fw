@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -69,6 +70,9 @@ func (c *Context) GetFastContext() *fasthttp.RequestCtx {
 
 func (c *Context) Injector() inject.Injector {
 	return c.inj
+}
+func (c *Context) Invoke(i interface{}) ([]reflect.Value, error) {
+	return c.inj.Invoke(i)
 }
 
 func (c *Context) Set(key string, value any) {

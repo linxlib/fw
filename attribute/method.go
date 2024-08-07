@@ -13,6 +13,7 @@ var innerAttrNames = map[string]AttributeType{
 	"CONNECT": TypeHttpMethod,
 	"ANY":     TypeHttpMethod,
 	"WS":      TypeHttpMethod,
+	"Ignore":  TypeOther,
 }
 
 func AddMethodAttributeType(name string, typ AttributeType) {

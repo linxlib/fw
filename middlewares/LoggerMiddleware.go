@@ -56,7 +56,7 @@ func (w *LoggerMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
 			params.ErrorMessage = "\nErr:" + err.(error).Error()
 		}
 
-		w.Logger.Printf("|%3s| %18s | %15s | %-7s %s %s%s",
+		w.Logger.Printf("|%3s| %18s | %20s | %-7s %s %s%s",
 			params.StatusCodeWithColor(),
 			params.LatencyWithColor(),
 			params.ClientIPWithColor(),

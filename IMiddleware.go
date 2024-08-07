@@ -1,6 +1,9 @@
 package fw
 
-import "github.com/linxlib/fw/attribute"
+import (
+	"github.com/linxlib/fw/attribute"
+	"reflect"
+)
 
 type AttributeName = string
 type SlotType = string
@@ -18,7 +21,8 @@ type IMiddleware interface {
 	SetParam(p string)
 	// GetParam return params string
 	GetParam() string
-	// doReg inner called by fw
+
+	// doReg inner called by fw middleware container
 	doReg()
 }
 type IMiddlewareMethod interface {
@@ -27,6 +31,13 @@ type IMiddlewareMethod interface {
 	CloneAsMethod() IMiddlewareMethod
 	// HandlerMethod will be called when wrap a method
 	HandlerMethod(next HandlerFunc) HandlerFunc
+	// GetMethodRValue returns the method's reflect value which called
+	GetMethodRValue() reflect.Value
+	SetMethodRValue(rv reflect.Value)
+
+	// HandlerIgnored will be called when a method is marked as @Ignore <ControllerMiddleware Attribute>
+	// only implement it when your middleware needs to handle @Ignore (like SessionMiddleware or AuthMiddleware)
+	HandlerIgnored(next HandlerFunc) HandlerFunc
 }
 type IMiddlewareCtl interface {
 	IMiddlewareMethod
@@ -35,6 +46,9 @@ type IMiddlewareCtl interface {
 	// HandlerController will be called when handling controller
 	// returns many RouteItem(field `Path` is not empty) if you want to register a route
 	HandlerController(base string) []*RouteItem
+	// GetCtlRValue returns the controller's reflect value that the called method belongs to
+	GetCtlRValue() reflect.Value
+	SetCtlRValue(rv reflect.Value)
 }
 
 type IMiddlewareGlobal interface {
@@ -49,7 +63,7 @@ type RouteItem struct {
 	Middleware IMiddlewareMethod // just refer to middleware itself
 }
 
-// EmptyRouteItem returns an empty RouteItem which won't register route
+// EmptyRouteItem returns an empty []*RouteItem which won't register any route
 func EmptyRouteItem(m IMiddlewareMethod) []*RouteItem {
 	return []*RouteItem{{
 		Method:     "",
@@ -75,9 +89,14 @@ func NewMiddlewareMethod(name string, attr string) *MiddlewareMethod {
 		Middleware: NewMiddleware(name, SlotMethod, attr),
 	}
 }
+func NewMiddlewareMethodForCtl(name string, attr string) *MiddlewareMethod {
+	return &MiddlewareMethod{
+		Middleware: NewMiddleware(name, SlotController, attr),
+	}
+}
 func NewMiddlewareCtl(name string, attr string) *MiddlewareCtl {
 	return &MiddlewareCtl{
-		Middleware: NewMiddleware(name, SlotController, attr),
+		MiddlewareMethod: NewMiddlewareMethodForCtl(name, attr),
 	}
 }
 
@@ -140,15 +159,54 @@ func (m *Middleware) SetParam(p string) {
 }
 
 type MiddlewareCtl struct {
-	*Middleware
+	*MiddlewareMethod
+	rValueCtl reflect.Value
+}
+
+func (m *MiddlewareCtl) GetCtlRValue() reflect.Value {
+	return m.rValueCtl
+}
+func (m *MiddlewareCtl) SetCtlRValue(v reflect.Value) {
+	m.rValueCtl = v
 }
 
 type MiddlewareMethod struct {
 	*Middleware
+	rValueMethod reflect.Value
+}
+
+func (m *MiddlewareMethod) GetMethodRValue() reflect.Value {
+	return m.rValueMethod
+}
+func (m *MiddlewareMethod) SetMethodRValue(v reflect.Value) {
+	m.rValueMethod = v
+}
+func (m *MiddlewareMethod) HandlerIgnored(nextHandlerFunc HandlerFunc) HandlerFunc {
+	return nextHandlerFunc
 }
 
 type MiddlewareGlobal struct {
 	*Middleware
+}
+
+func (m *MiddlewareGlobal) GetMethodRValue() reflect.Value {
+	return reflect.Value{}
+}
+
+func (m *MiddlewareGlobal) SetMethodRValue(rv reflect.Value) {
+
+}
+
+func (m *MiddlewareGlobal) GetCtlRValue() reflect.Value {
+	return reflect.Value{}
+}
+
+func (m *MiddlewareGlobal) SetCtlRValue(rv reflect.Value) {
+
+}
+
+func (m *MiddlewareGlobal) HandlerIgnored(nextHandlerFunc HandlerFunc) HandlerFunc {
+	return nextHandlerFunc
 }
 
 const (
