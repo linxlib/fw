@@ -21,7 +21,7 @@ require (
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/linxlib/conv v1.1.1 // indirect
 	github.com/linxlib/inject v0.1.3 // indirect
-	github.com/mattn/go-runewidth v0.0.9 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
