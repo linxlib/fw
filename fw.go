@@ -502,6 +502,15 @@ func (s *Server) addRouteTable(controllerName, method, routePath, methodName, si
 }
 
 func (s *Server) Run() {
+	if s.hookHandler != nil {
+		for _, file := range s.parser.Files {
+			if !file.IsMain() {
+				continue
+			}
+
+			s.hookHandler.HandleServerInfo(file.Comments)
+		}
+	}
 	var node = pterm.TreeNode{
 		Text: "FW Server",
 	}
