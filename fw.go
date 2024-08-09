@@ -23,12 +23,13 @@ import (
 	"time"
 )
 
-const Version = "1.0.0-beta"
+const Version = "v1.0.0@beta"
 
 type HookHandler interface {
 	HandleServerInfo(si []string)
 	HandleStructs(ctl *astp.Element)
-	HandleParams(pf *astp.Element)
+
+	Print(slot string)
 }
 
 func New() *Server {
@@ -40,6 +41,7 @@ func New() *Server {
 		parser:             astp.NewParser(),
 		middleware:         NewMiddlewareContainer(),
 		routerTreeForPrint: make(map[string][][2]string),
+		start:              time.Now(),
 	}
 	pterm.DefaultHeader.WithBackgroundStyle(pterm.NewStyle(pterm.BgBlack)).WithFullWidth().Println("FW for golang developers")
 	logger := logrus.New()
@@ -145,6 +147,7 @@ type Server struct {
 	midGlobals         []IMiddlewareMethod
 	hookHandler        HookHandler
 	routerTreeForPrint map[string][][2]string
+	start              time.Time
 }
 
 func (s *Server) RegisterHooks(handler HookHandler) {
@@ -167,43 +170,6 @@ func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 	}
 }
 
-func (s *Server) addRouteTable(a, b, c, d, e string) {
-	var fcolor1 = func(method string) string {
-		switch method {
-		case "GET":
-			return color.Blue.Sprint(method)
-		case "POST":
-			return color.Cyan.Sprint(method)
-		case "PUT":
-			return color.Yellow.Sprint(method)
-		case "DELETE":
-			return color.Red.Sprint(method)
-		case "PATCH":
-			return color.Green.Sprint(method)
-		case "HEAD":
-			return color.Magenta.Sprint(method)
-		case "OPTIONS":
-			return color.White.Sprint(method)
-		default:
-			return color.Normal.Sprint(method)
-		}
-	}
-	a = color.Magenta.Sprint(a)
-	if v, ok := s.routerTreeForPrint[a]; ok {
-		var temp [2]string
-		temp[0] = color.HiYellow.Sprint(e)
-		temp[1] = fmt.Sprintf("%s %s -> %s", fcolor1(b), c, color.HiGreen.Sprint(d))
-		v = append(v, temp)
-		s.routerTreeForPrint[a] = v
-	} else {
-		s.routerTreeForPrint[a] = make([][2]string, 0)
-		var temp [2]string
-		temp[0] = color.HiYellow.Sprint(e)
-		temp[1] = fmt.Sprintf("%s %s -> %s", fcolor1(b), c, color.HiGreen.Sprint(d))
-		s.routerTreeForPrint[a] = append(s.routerTreeForPrint[a], temp)
-	}
-}
-
 func (s *Server) RegisterRoutes(controller ...any) {
 	for _, a := range controller {
 		s.RegisterRoute(a)
@@ -214,11 +180,11 @@ const controllerAttr = "Controller"
 const controllerRoute = "Route"
 
 func (s *Server) RegisterRoute(controller any) {
-	defer func() {
-		if err := recover(); err != nil {
-			s.logger.Error(err)
-		}
-	}()
+	//defer func() {
+	//	if err := recover(); err != nil {
+	//		s.logger.Error(err)
+	//	}
+	//}()
 	//假定astp已经解析好了整个项目，并通过某种方式还原了Parser内部的值
 	// 这里需要通过传入的controller指针 并通过反射方式获取到 controller method param result各种的反射值，并填充到已有的Parser里
 	// 这里的指针 通过代码生成的方式
@@ -242,7 +208,8 @@ func (s *Server) RegisterRoute(controller any) {
 					panic(err)
 				}
 				if !item.IsHide {
-					s.addRouteTable("Global", item.Method, item.Path, "", "@"+item.Middleware.Name())
+
+					s.addRouteTable("Global", item.Method, item.Path, item.Middleware.Name()+".H", "@"+item.Middleware.Name())
 				}
 
 			}
@@ -280,7 +247,7 @@ func (s *Server) RegisterRoute(controller any) {
 					continue
 				}
 				if !item.IsHide {
-					s.addRouteTable(ctl.Name, item.Method, item.Path, ctl.Name, "@"+item.Middleware.Name())
+					s.addRouteTable(ctl.Name, item.Method, item.Path, ctl.Name, "@"+item.Middleware.Attribute())
 				}
 			}
 
@@ -314,15 +281,17 @@ func (s *Server) RegisterRoute(controller any) {
 			}
 			attrs, call1 := s.handle(method, mids, toIgnore)
 			sig := strings.Builder{}
-			for _, mid := range mids {
-				sig.WriteString("@")
-				sig.WriteString(mid.Attribute())
-				sig.WriteRune(',')
-			}
-			for _, attr := range attrs {
+			//for _, mid := range mids {
+			//	sig.WriteString("@")
+			//	sig.WriteString(mid.Attribute())
+			//	sig.WriteRune(',')
+			//}
+			for i, attr := range attrs {
+				if i != 0 {
+					sig.WriteRune(',')
+				}
 				sig.WriteString("@")
 				sig.WriteString(attr)
-				sig.WriteRune(',')
 			}
 
 			for i, hm := range hms {
@@ -331,16 +300,13 @@ func (s *Server) RegisterRoute(controller any) {
 					continue
 				}
 				receiver := method.MustGetElement(astp.ElementReceiver)
-				if receiver != nil {
-					controllerName := receiver.TypeString
-					route := joinRoute(base, rps[i])
-					if receiver.TypeString != ctl.Name {
-						controllerName = ctl.Name
-						sig.WriteString("@inherit")
-					}
-					s.addRouteTable(controllerName, strings.ToUpper(hm), route, method.Name, sig.String())
+				controllerName := receiver.TypeString
+				route := joinRoute(base, rps[i])
+				if method.FromParent {
+					sig.WriteRune(',')
+					sig.WriteString("@inherit")
 				}
-
+				s.addRouteTable(controllerName, strings.ToUpper(hm), route, method.Name, sig.String())
 			}
 
 		})
@@ -394,9 +360,6 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 			if strings.ToLower(cmd.Name) == "service" || cmd.Name == "" {
 
 			} else {
-				if s.hookHandler != nil {
-					s.hookHandler.HandleParams(param)
-				}
 
 				// 对方法参数进行数据映射和校验
 				if err := binding.GetByAttr(cmd).Bind(c.GetFastContext(), body.Interface()); err != nil {
@@ -481,6 +444,7 @@ func (s *Server) handle(handler *astp.Element, mids []IMiddlewareMethod, toIgnor
 			next = mid.HandlerIgnored(next)
 			continue
 		}
+		attrs1 = append(attrs1, mid.Attribute())
 		next = mid.HandlerMethod(next)
 	}
 	// 这里全局的中间件 仅针对于方法，不会对Controller做出改变
@@ -490,7 +454,54 @@ func (s *Server) handle(handler *astp.Element, mids []IMiddlewareMethod, toIgnor
 	return attrs1, next
 }
 
-func (s *Server) Run() error {
+func (s *Server) addRouteTable(controllerName, method, routePath, methodName, signature string) {
+	var fcolor1 = func(method string) string {
+		switch method {
+		case "GET":
+			return color.Blue.Sprint(method)
+		case "POST":
+			return color.Cyan.Sprint(method)
+		case "PUT":
+			return color.Yellow.Sprint(method)
+		case "DELETE":
+			return color.Red.Sprint(method)
+		case "PATCH":
+			return color.Green.Sprint(method)
+		case "HEAD":
+			return color.Magenta.Sprint(method)
+		case "OPTIONS":
+			return color.White.Sprint(method)
+		default:
+			return color.Normal.Sprint(method)
+		}
+	}
+	const itemFmt = "%-16s %-30s%-30s"
+	controllerName = color.Magenta.Sprint(controllerName)
+	if v, ok := s.routerTreeForPrint[controllerName]; ok {
+		var temp [2]string
+		temp[0] = color.HiYellow.Sprint(signature)
+		if methodName == "" {
+			temp[1] = fmt.Sprintf(itemFmt, fcolor1(method), routePath, color.HiGreen.Sprint(""))
+		} else {
+			temp[1] = fmt.Sprintf(itemFmt, fcolor1(method), routePath, "-> "+color.HiGreen.Sprint(methodName))
+		}
+
+		v = append(v, temp)
+		s.routerTreeForPrint[controllerName] = v
+	} else {
+		s.routerTreeForPrint[controllerName] = make([][2]string, 0)
+		var temp [2]string
+		temp[0] = color.HiYellow.Sprint(signature)
+		if methodName == "" {
+			temp[1] = fmt.Sprintf(itemFmt, fcolor1(method), routePath, color.HiGreen.Sprint(""))
+		} else {
+			temp[1] = fmt.Sprintf(itemFmt, fcolor1(method), routePath, "-> "+color.HiGreen.Sprint(methodName))
+		}
+		s.routerTreeForPrint[controllerName] = append(s.routerTreeForPrint[controllerName], temp)
+	}
+}
+
+func (s *Server) Run() {
 	var node = pterm.TreeNode{
 		Text: "FW Server",
 	}
@@ -508,10 +519,40 @@ func (s *Server) Run() error {
 		node.Children = append(node.Children, no)
 	}
 	pterm.DefaultTree.WithRoot(node).Render()
-	internal.OKf("fw server@%s serving at http://%s:%d%s", Version, s.option.Listen, s.option.Port, s.option.BasePath)
 	s.server.Handler = s.router.Handler
 	s.server.StreamRequestBody = true
 	s.server.Name = s.option.Name
+
+	done := make(chan bool)
+	go func() {
+		err := s.server.ListenAndServe(fmt.Sprintf("%s:%d", s.option.Listen, s.option.Port))
+		if err != nil {
+			internal.Errorf("Failed to start server: %v", err)
+			done <- true
+			return
+		}
+	}()
+
+	style := pterm.NewStyle(pterm.FgLightGreen, pterm.Bold)
+	style1 := pterm.NewStyle(pterm.FgLightGreen)
+	style2 := pterm.NewStyle(pterm.FgDarkGray)
+	style3 := pterm.NewStyle(pterm.FgLightWhite, pterm.Bold)
+	style4 := pterm.NewStyle(pterm.FgWhite)
+	style.Print("FW ")
+	style1.Print(Version + " ")
+	style2.Print("ready in ")
+	style3.Println(time.Now().Sub(s.start).String())
+
+	//color.Printf("%s %s %s\n", color.HiGreen.Sprintf("FW %s", Version), color.Gray.Sprint("ready in"), color.HiWhite.Sprint("568ms"))
+	style.Print("➜ ")
+	style3.Printf("%-10s", "Local: ")
+	style4.Printf("http://%s:%d%s\n", "localhost", s.option.Port, s.option.BasePath)
+	style.Print("➜ ")
+	style3.Printf("%-10s", "Network: ")
+	style4.Printf("http://%s:%d%s\n", s.option.IntranetIP, s.option.Port, s.option.BasePath)
+	if s.hookHandler != nil {
+		s.hookHandler.Print(AfterListen)
+	}
 	if s.option.Dev {
 		if runtime.GOOS == "darwin" {
 			internal.Note("press ⌘+C to exit...")
@@ -519,9 +560,17 @@ func (s *Server) Run() error {
 			internal.Note("press CTRL+C to exit...")
 		}
 	}
-
-	return s.server.ListenAndServe(fmt.Sprintf("%s:%d", s.option.Listen, s.option.Port))
+	for {
+		select {
+		case <-done:
+			return
+		}
+	}
 }
+
+const (
+	AfterListen = "afterListen"
+)
 
 // Use register middleware to server.
 // you can only use the @'Attribute' after register a middleware

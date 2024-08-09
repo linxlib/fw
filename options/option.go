@@ -6,7 +6,7 @@ import (
 )
 
 type ServerOption struct {
-	intranetIP            string
+	IntranetIP            string
 	Dev                   bool         `yaml:"dev" default:"true"`
 	Debug                 bool         `yaml:"debug" default:"true"`
 	NoColor               bool         `yaml:"nocolor" default:"false"`
@@ -33,7 +33,7 @@ type LoggerOption struct {
 }
 
 func ReadConfig(o *ServerOption) {
-	o.intranetIP = getIntranetIP()
+	o.IntranetIP = getIntranetIP()
 	err := configor.New(&configor.Config{
 		AutoReload: true,
 		Silent:     true,
