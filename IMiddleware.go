@@ -2,6 +2,7 @@ package fw
 
 import (
 	"github.com/linxlib/fw/attribute"
+	"github.com/linxlib/inject"
 	"reflect"
 )
 
@@ -24,7 +25,7 @@ type IMiddleware interface {
 
 	// doReg inner called by fw middleware container
 	doReg()
-	Constructor()
+	Constructor(server inject.Provider)
 }
 type IMiddlewareMethod interface {
 	IMiddleware
@@ -114,7 +115,7 @@ type Middleware struct {
 	param string
 }
 
-func (m *Middleware) Constructor() {
+func (m *Middleware) Constructor(server inject.Provider) {
 
 }
 

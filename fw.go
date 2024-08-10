@@ -198,7 +198,6 @@ type HandlerFunc = func(*Context)
 // wrap the HandlerFunc to fasthttp.RequestHandler
 // just create *Context
 func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
-
 	return func(ctx *fasthttp.RequestCtx) {
 		start := time.Now()
 		c := newContext(ctx, s)
@@ -289,7 +288,6 @@ func (s *Server) RegisterRoute(controller any) {
 					s.addRouteTable(ctl.Name, item.Method, item.Path, ctl.Name, "@"+item.Middleware.Attribute())
 				}
 			}
-
 		}
 		if s.hookHandler != nil {
 			s.hookHandler.HandleStructs(ctl)
@@ -300,31 +298,48 @@ func (s *Server) RegisterRoute(controller any) {
 		}, func(method *astp.Element) {
 			vm := refVal.MethodByName(method.Name)
 			vmt := reflect.TypeOf(vm.Interface())
-
+			// 此处将方法参数得反射类型（reflect.Type）暂存
 			method.VisitElementsAll(astp.ElementParam, func(param *astp.Element) {
 				param.SetRType(vmt.In(param.Index))
 			})
+			// 方法的reflect.Value暂存，用于传递给中间件
 			method.SetRValue(vm)
 			method.SetValue(vm.Interface())
 			var hms = make([]string, 0)
 			var rps = make([]string, 0)
 			var toIgnore string
-			for _, command := range attribute.GetMethodAttributes(method) {
-				if command.Type == attribute.TypeHttpMethod {
-					hms = append(hms, command.Name)
-					rps = append(rps, command.Value)
-				} else if command.Name == "Ignore" && command.Value != "" {
+			for _, attr := range attribute.GetMethodAttributes(method) {
+				if attr.Type == attribute.TypeHttpMethod {
+					hms = append(hms, attr.Name)
+					rps = append(rps, attr.Value)
+				} else if attr.Name == "Ignore" && attr.Value != "" {
 					//处理忽略
-					toIgnore = command.Value
+					toIgnore = attr.Value
 				}
 			}
-			attrs, call1 := s.handle(method, mids, toIgnore)
+			// 先处理方法上标记的中间件
+			attrs, next := s.handle(method)
+			// 然后处理controller上的中间件
+			for _, mid := range mids {
+				mid.SetMethodRValue(method.GetRValue())
+				// 如果方法上打了 @Ignore Auth 则需要忽略 Auth这个代表 AuthMiddleware 的中间件
+				//TODO: 是否需要处理 @Ignore 多个的情况？
+				if toIgnore == mid.Attribute() {
+					// 一个中间件被忽略，则忽略调用其 HandlerMethod，改为调用 HandlerIgnored
+					next = mid.HandlerIgnored(next)
+					continue
+				}
+				attrs = append(attrs, mid.Attribute())
+				next = mid.HandlerMethod(next)
+			}
+			// 这里全局的中间件 仅针对于方法，不会对Controller做出改变
+			for _, global := range s.midGlobals {
+				//global的中间件一般是没有attr的，因此暂不处理
+				//attrs = append(attrs, global.Attribute())
+				next = global.HandlerMethod(next)
+			}
+
 			sig := strings.Builder{}
-			//for _, mid := range mids {
-			//	sig.WriteString("@")
-			//	sig.WriteString(mid.Attribute())
-			//	sig.WriteRune(',')
-			//}
 			for i, attr := range attrs {
 				if i != 0 {
 					sig.WriteRune(',')
@@ -334,7 +349,7 @@ func (s *Server) RegisterRoute(controller any) {
 			}
 
 			for i, hm := range hms {
-				err := s.registerRoute(strings.ToUpper(hm), joinRoute(base, rps[i]), call1)
+				err := s.registerRoute(strings.ToUpper(hm), joinRoute(base, rps[i]), next)
 				if err != nil {
 					continue
 				}
@@ -355,7 +370,6 @@ func (s *Server) RegisterRoute(controller any) {
 
 func (s *Server) registerRoute(method string, path string, f HandlerFunc) error {
 	call1 := s.wrap(f)
-
 	switch method {
 	case "POST":
 		s.router.POST(path, call1)
@@ -392,21 +406,21 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 		//TODO: 根据请求方法和contentType进行binding
 		cmd := attribute.GetLastAttr(param)
 		if cmd.Type == attribute.TypeInner {
+			continue
+		}
+		//TODO: 是否要兼容 非指针方式声明的参数
+		paramV := reflect.New(param.GetRType().Elem())
+		if strings.ToLower(cmd.Name) == "service" || cmd.Name == "" {
 
 		} else {
-			//TODO: 是否要兼容 非指针方式声明的参数
-			body := reflect.New(param.GetRType().Elem())
-			if strings.ToLower(cmd.Name) == "service" || cmd.Name == "" {
 
-			} else {
-
-				// 对方法参数进行数据映射和校验
-				if err := binding.GetByAttr(cmd).Bind(c.GetFastContext(), body.Interface()); err != nil {
-					return err
-				}
+			// 对方法参数进行数据映射和校验
+			if err := binding.GetByAttr(cmd).Bind(c.GetFastContext(), paramV.Interface()); err != nil {
+				return err
 			}
-			c.Map(body.Interface())
 		}
+		c.Map(paramV.Interface())
+
 	}
 
 	return nil
@@ -459,7 +473,7 @@ func (s *Server) handleCtl(base string, ctl *astp.Element) []*RouteItem {
 	return result
 }
 
-func (s *Server) handle(handler *astp.Element, mids []IMiddlewareMethod, toIgnore string) ([]string, HandlerFunc) {
+func (s *Server) handle(handler *astp.Element) ([]string, HandlerFunc) {
 	//先把实际的方法wrap成HandlerFunc
 	next := s.wrapM(handler)
 	// 先处理method上的中间件
@@ -474,21 +488,6 @@ func (s *Server) handle(handler *astp.Element, mids []IMiddlewareMethod, toIgnor
 			mid.SetMethodRValue(handler.GetRValue())
 			next = mid.HandlerMethod(next)
 		}
-	}
-	// 然后处理controller上的中间件
-	for _, mid := range mids {
-		mid.SetMethodRValue(handler.GetRValue())
-		// 如果方法上打了 @Ignore Auth 则需要忽略 Auth这个代表 AuthMiddleware 的中间件
-		if toIgnore == mid.Attribute() {
-			next = mid.HandlerIgnored(next)
-			continue
-		}
-		attrs1 = append(attrs1, mid.Attribute())
-		next = mid.HandlerMethod(next)
-	}
-	// 这里全局的中间件 仅针对于方法，不会对Controller做出改变
-	for _, global := range s.midGlobals {
-		next = global.HandlerMethod(next)
 	}
 	return attrs1, next
 }
