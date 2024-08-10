@@ -24,6 +24,7 @@ type IMiddleware interface {
 
 	// doReg inner called by fw middleware container
 	doReg()
+	Constructor()
 }
 type IMiddlewareMethod interface {
 	IMiddleware
@@ -111,6 +112,10 @@ type Middleware struct {
 	name  string
 	attr  string
 	param string
+}
+
+func (m *Middleware) Constructor() {
+
 }
 
 func (m *Middleware) doReg() {

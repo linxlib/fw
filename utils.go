@@ -12,6 +12,7 @@ import (
 	"github.com/linxlib/fw/internal/json"
 	"github.com/sirupsen/logrus"
 	"mime"
+	"net"
 	"reflect"
 	"strconv"
 	"strings"
@@ -589,4 +590,16 @@ var statusMessage = []string{
 	508: "Loop Detected",                   // StatusLoopDetected
 	510: "Not Extended",                    // StatusNotExtended
 	511: "Network Authentication Required", // StatusNetworkAuthenticationRequired
+}
+
+func getIntranetIP() string {
+	conn, err := net.Dial("udp", "114.114.114.114:80")
+	if err != nil {
+		return "127.0.0.1"
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String()
 }
