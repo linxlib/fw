@@ -626,6 +626,6 @@ func (s *Server) Use(middleware IMiddleware) {
 	if err != nil {
 		log.Println(err)
 	}
-	middleware.Constructor()
+	middleware.Constructor(s.Injector)
 	s.middleware.Reg(middleware)
 }

@@ -9,7 +9,7 @@ require (
 	github.com/gookit/color v1.5.4
 	github.com/gookit/validate v1.5.2
 	github.com/linxlib/astp v0.0.0-00010101000000-000000000000
-	github.com/linxlib/config v0.2.3
+	github.com/linxlib/config v0.2.4
 	github.com/linxlib/conv v1.1.1
 	github.com/linxlib/inject v0.1.3
 	github.com/pterm/pterm v0.12.79
