@@ -1,5 +1,7 @@
 package fw
 
+import "strings"
+
 // MiddlewareContainer stores middlewares
 // global middlewares will be stored with its Name as key
 type MiddlewareContainer struct {
@@ -24,9 +26,9 @@ func (m *MiddlewareContainer) Reg(middleware IMiddleware) {
 	case SlotGlobal:
 		m.ms[st][middleware.Name()] = middleware
 	case SlotController:
-		m.ms[st][middleware.Attribute()] = middleware
+		m.ms[st][strings.ToUpper(middleware.Attribute())] = middleware
 	case SlotMethod:
-		m.ms[st][middleware.Attribute()] = middleware
+		m.ms[st][strings.ToUpper(middleware.Attribute())] = middleware
 	}
 
 }

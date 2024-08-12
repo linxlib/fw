@@ -2,35 +2,19 @@ package attribute
 
 import "github.com/linxlib/astp"
 
-var innerAttrNames = map[string]AttributeType{
-	"GET":     TypeHttpMethod,
-	"POST":    TypeHttpMethod,
-	"PUT":     TypeHttpMethod,
-	"DELETE":  TypeHttpMethod,
-	"HEAD":    TypeHttpMethod,
-	"OPTIONS": TypeHttpMethod,
-	"TRACE":   TypeHttpMethod,
-	"CONNECT": TypeHttpMethod,
-	"ANY":     TypeHttpMethod,
-	"WS":      TypeHttpMethod,
-	"Ignore":  TypeOther,
-}
-
-func AddMethodAttributeType(name string, typ AttributeType) {
-	innerAttrNames[name] = typ
-}
-
 var attrMethodCaches = make(map[*astp.Element][]*Attribute)
 
+// GetMethodAttributes 解析方法上的注释
 func GetMethodAttributes(m *astp.Element) []*Attribute {
 	if cmdCache, ok := attrMethodCaches[m]; ok {
 		return cmdCache
 	}
-	cmdCache := ParseDoc(m.Docs, m.Name, innerAttrNames)
+	cmdCache := ParseDoc(m.Docs, m.Name)
 	attrMethodCaches[m] = cmdCache
 	return cmdCache
 }
 
+// GetMethodAttributesAsMiddleware 提取方法上的中间件标记
 func GetMethodAttributesAsMiddleware(m *astp.Element) []*Attribute {
 	results := make([]*Attribute, 0)
 	attrs := GetMethodAttributes(m)

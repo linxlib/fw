@@ -105,9 +105,9 @@ func New() *Server {
 				logrus.ErrorLevel: dir + "/error.log",
 				logrus.DebugLevel: dir + "/debug.log",
 			}
-			logger.AddHook(NewFileHook(pathMap, Json()))
+			logger.AddHook(NewFileHook(pathMap, File()))
 		} else {
-			logger.AddHook(NewFileHook(dir+"/fw.log", Json()))
+			logger.AddHook(NewFileHook(dir+"/fw.log", File()))
 		}
 	} else {
 		if s.option.Logger.SeparateLevelFile {
@@ -138,7 +138,7 @@ func New() *Server {
 					LocalTime:  s.option.Logger.LocalTime,
 				},
 			}
-			logger.AddHook(NewFileHook(writerMap, Json()))
+			logger.AddHook(NewFileHook(writerMap, File()))
 		} else {
 
 			logger.AddHook(NewFileHook(&lumberjack.Logger{
@@ -148,7 +148,7 @@ func New() *Server {
 				MaxAge:     s.option.Logger.MaxAge,
 				MaxBackups: s.option.Logger.MaxBackups,
 				LocalTime:  s.option.Logger.LocalTime,
-			}, Json()))
+			}, File()))
 		}
 
 	}
@@ -312,9 +312,9 @@ func (s *Server) RegisterRoute(controller any) {
 				if attr.Type == attribute.TypeHttpMethod {
 					hms = append(hms, attr.Name)
 					rps = append(rps, attr.Value)
-				} else if attr.Name == "Ignore" && attr.Value != "" {
+				} else if strings.ToUpper(attr.Name) == "IGNORE" && attr.Value != "" {
 					//处理忽略
-					toIgnore = attr.Value
+					toIgnore = strings.ToUpper(attr.Value)
 				}
 			}
 			// 先处理方法上标记的中间件
@@ -324,7 +324,7 @@ func (s *Server) RegisterRoute(controller any) {
 				mid.SetMethodRValue(method.GetRValue())
 				// 如果方法上打了 @Ignore Auth 则需要忽略 Auth这个代表 AuthMiddleware 的中间件
 				//TODO: 是否需要处理 @Ignore 多个的情况？
-				if toIgnore == mid.Attribute() {
+				if toIgnore == strings.ToUpper(mid.Attribute()) {
 					// 一个中间件被忽略，则忽略调用其 HandlerMethod，改为调用 HandlerIgnored
 					next = mid.HandlerIgnored(next)
 					continue
@@ -357,7 +357,10 @@ func (s *Server) RegisterRoute(controller any) {
 				controllerName := receiver.TypeString
 				route := joinRoute(base, rps[i])
 				if method.FromParent {
-					sig.WriteRune(',')
+					if sig.Len() != 0 {
+						sig.WriteRune(',')
+					}
+
 					sig.WriteString("@inherit")
 				}
 				s.addRouteTable(controllerName, strings.ToUpper(hm), route, method.Name, sig.String())

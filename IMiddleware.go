@@ -122,9 +122,9 @@ func (m *Middleware) Constructor(server inject.Provider) {
 func (m *Middleware) doReg() {
 	switch m.slot {
 	case SlotMethod:
-		attribute.AddMethodAttributeType(m.attr, attribute.TypeMiddleware)
+		attribute.RegAttributeType(m.attr, attribute.TypeMiddleware)
 	case SlotController:
-		attribute.AddStructAttributeType(m.attr, attribute.TypeMiddleware)
+		attribute.RegAttributeType(m.attr, attribute.TypeMiddleware)
 	case SlotGlobal:
 
 	default:

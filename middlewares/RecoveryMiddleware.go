@@ -73,6 +73,7 @@ func (s *RecoveryMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
 					reqStr.WriteString(fmt.Sprintf("Body: %s\n", context.GetFastContext().PostBody()))
 
 					if s.isDebug {
+
 						s.Logger.Printf(
 							"["+color.HiCyan.Render("Recovery")+"] panic recovered: %s\n"+color.HiYellow.Render("Request:")+"\n%s"+color.HiYellow.Render("Stack Trace:")+"\n%s\n",
 							color.HiRed.Render(errMsg),

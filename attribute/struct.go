@@ -1,44 +1,34 @@
 package attribute
 
-import "github.com/linxlib/astp"
+import (
+	"github.com/linxlib/astp"
+	"strings"
+)
 
-var innerStructAttrNames = map[string]AttributeType{
-	"Route":      TypeMiddleware,
-	"Controller": TypeTagger,
-	"Ctl":        TypeTagger,
-	"Base":       TypeTagger,
-
-	"Body":      TypeParam,
-	"Json":      TypeParam,
-	"Path":      TypeParam,
-	"Form":      TypeParam,
-	"Header":    TypeParam,
-	"Query":     TypeParam,
-	"Cookie":    TypeParam,
-	"XML":       TypeParam,
-	"Multipart": TypeParam,
-	"Service":   TypeParam,
-	"Plain":     TypeParam,
-}
 var cmdStructCaches = make(map[*astp.Element][]*Attribute)
 
-func AddStructAttributeType(name string, t AttributeType) {
-	innerStructAttrNames[name] = t
-}
-
+// GetStructAttrs 获取结构体的注释
 func GetStructAttrs(s *astp.Element) []*Attribute {
 	if cmdCache, ok := cmdStructCaches[s]; ok {
 		return cmdCache
 	}
-	cmdCache := ParseDoc(s.Docs, s.Name, innerStructAttrNames)
-	cmdStructCaches[s] = cmdCache
+
+	cmdCache := ParseDoc(s.Docs, s.Name)
+	if cmdCache != nil {
+		cmdStructCaches[s] = cmdCache
+	}
 	return cmdCache
 }
 
-func HasAttribute(s *astp.Element, name string) bool {
+// HasAttribute 是否有特定注释
+func HasAttribute(s *astp.Element, attrName string) bool {
+	if s == nil {
+		return false
+	}
+	attrName = strings.ToUpper(attrName)
 	if cmdCache, ok := cmdStructCaches[s]; ok {
 		for _, cmd := range cmdCache {
-			if cmd.Name == name {
+			if cmd.Name == attrName {
 				return true
 			}
 		}
@@ -47,14 +37,17 @@ func HasAttribute(s *astp.Element, name string) bool {
 		if cmdCache == nil || len(cmdCache) <= 0 {
 			return false
 		}
-		return GetStructAttrByName(s, name) != nil
+		return GetStructAttrByName(s, attrName) != nil
 	}
 	return false
 }
-func GetStructAttrByName(s *astp.Element, name string) *Attribute {
+
+// GetStructAttrByName 按attr名称返回，不存在则返回nil
+func GetStructAttrByName(s *astp.Element, attrName string) *Attribute {
+	attrName = strings.ToUpper(attrName)
 	if cmdCache, ok := cmdStructCaches[s]; ok {
 		for _, cmd := range cmdCache {
-			if cmd.Name == name {
+			if cmd.Name == attrName {
 				return cmd
 			}
 		}
@@ -63,11 +56,12 @@ func GetStructAttrByName(s *astp.Element, name string) *Attribute {
 		if cmdCache == nil || len(cmdCache) <= 0 {
 			return nil
 		}
-		return GetStructAttrByName(s, name)
+		return GetStructAttrByName(s, attrName)
 	}
 	return nil
 }
 
+// GetStructAttrAsMiddleware 返回结构体上的中间件类attr
 func GetStructAttrAsMiddleware(s *astp.Element) []*Attribute {
 	results := make([]*Attribute, 0)
 	attrs := GetStructAttrs(s)

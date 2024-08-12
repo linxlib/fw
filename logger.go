@@ -60,30 +60,16 @@ type RootFields struct {
 	Fields    interface{}
 }
 type Formatter struct {
-	/** if enabled, the whole log will be marshaled to json (including captions)
-	  work as json Formatter. */
-	TransportToJson bool
-	/** if enabled, log prefixed with 'timestamp, level' */
-	UseDefaultCaption bool
-	/** if enabled, CustomCaption will be marshaled to json */
-	CustomCaptionPrettyPrint bool
-
-	/** if has value, it attached right before message(object). custom caption can be struct, string, whatever */
-	CustomCaption interface{}
-	/** do PrettyPrint for message(object) */
 	PrettyPrint bool
-	/** if enabled, the message(object) will be colorized by predefined color code, along with logLevel */
-	Colorize bool
+	Colorize    bool
 }
 
-/** syntatic sugar for using formatter with predefined option (for console) */
 func Console() *Formatter {
-	return &Formatter{UseDefaultCaption: true, PrettyPrint: true, Colorize: true}
+	return &Formatter{PrettyPrint: true, Colorize: true}
 }
 
-/** syntatic sugar for using formatter with predefined option (for server, json) */
-func Json() *Formatter {
-	return &Formatter{TransportToJson: true, UseDefaultCaption: true}
+func File() *Formatter {
+	return &Formatter{}
 }
 
 type (
@@ -95,26 +81,14 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 	root := RootFields{Fields: encode(entry.Message)}
 
-	if f.UseDefaultCaption {
-		if f.TransportToJson {
-			root = RootFields{
-				Fields: JO{
-					"time_stamp": entry.Time.Format(time.DateTime),
-					"level":      entry.Level,
-					"message":    encode(entry.Message),
-				},
-			}
-		} else {
-			root = RootFields{Timestamp: entry.Time.Format(time.DateTime), Level: entry.Level,
-				Fields: encode(entry.Message)}
+	root = RootFields{Timestamp: entry.Time.Format(time.DateTime), Level: entry.Level,
+		Fields: encode(entry.Message)}
 
-			if f.Colorize {
-				color.Fprintf(b, "%s ", white(root.Timestamp))
-			} else {
-				b.WriteString(root.Timestamp)
-				b.WriteString(" ")
-			}
-		}
+	if f.Colorize {
+		color.Fprintf(b, "%s ", white(root.Timestamp))
+	} else {
+		b.WriteString(root.Timestamp)
+		b.WriteString(" ")
 	}
 
 	if entry.HasCaller() && entry.Level <= logrus.ErrorLevel {
@@ -122,19 +96,12 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 		file := fmt.Sprintf("%s:%d", entry.Caller.File, entry.Caller.Line)
 		b.WriteString(prettierCaller(file, fc))
 	}
+	captionStr := "FW"
 
-	if f.CustomCaption != nil {
-		captionStr := ""
-		if f.CustomCaptionPrettyPrint {
-			captionStr = marshalIndent(f.CustomCaption)
-		} else {
-			captionStr = marshal(f.CustomCaption)
-		}
-		if f.Colorize {
-			color.Fprintf(b, " [%s] ", green(captionStr))
-		} else {
-			b.WriteString(" [" + captionStr + "] ")
-		}
+	if f.Colorize {
+		color.Fprintf(b, " [%s] ", green(captionStr))
+	} else {
+		b.WriteString(" [" + captionStr + "] ")
 	}
 
 	var data string
