@@ -337,12 +337,12 @@ func (s *Server) RegisterRoute(controller any) {
 				}
 			}
 			// 先处理方法上标记的中间件
-			attrs, next := s.handle(ctl.Name, method)
+			attrs, next := s.handle(ctl, method)
 			// 然后处理controller上的中间件
 			for _, mid := range middlewareCtls {
 				attrs = append(attrs, mid.Attribute())
 				ctx := newMiddlewareContext(ctl.Name, method.Name, SlotMethod, "", next)
-				ctx.SetRValue(method.GetRValue())
+				ctx.SetRValue(ctl.GetRValue())
 				// 如果方法上打了 @Ignore Auth 则需要忽略 Auth这个代表 AuthMiddleware 的中间件
 				//TODO: 是否需要处理 @Ignore 多个的情况？
 				if toIgnore == strings.ToUpper(mid.Attribute()) {
@@ -460,7 +460,7 @@ func (s *Server) wrapM(handler *astp.Element) HandlerFunc {
 	}
 }
 
-func (s *Server) handle(name string, handler *astp.Element) ([]string, HandlerFunc) {
+func (s *Server) handle(ctl *astp.Element, handler *astp.Element) ([]string, HandlerFunc) {
 	//先把实际的方法wrap成HandlerFunc
 	next := s.wrapM(handler)
 	// 先处理method上的中间件
@@ -470,8 +470,8 @@ func (s *Server) handle(name string, handler *astp.Element) ([]string, HandlerFu
 		if mid, ok := s.middleware.GetByAttributeMethod(attr.Name); ok {
 			attrs1 = append(attrs1, mid.Attribute())
 
-			ctx := newMiddlewareContext(name, handler.Name, SlotMethod, attr.Value, next)
-			ctx.SetRValue(handler.GetRValue())
+			ctx := newMiddlewareContext(ctl.Name, handler.Name, SlotMethod, attr.Value, next)
+			ctx.SetRValue(ctl.GetRValue())
 			next = mid.Execute(ctx)
 		}
 	}
