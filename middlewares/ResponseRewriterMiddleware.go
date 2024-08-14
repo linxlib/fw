@@ -11,17 +11,15 @@ type Data[T int | string] struct {
 	Data    interface{}
 }
 
+var _ fw.IMiddlewareGlobal = (*ResponseRewriterMiddleware)(nil)
+
 type ResponseRewriterMiddleware struct {
 	*fw.MiddlewareGlobal
 }
 
-func (s *ResponseRewriterMiddleware) CloneAsMethod() fw.IMiddlewareMethod {
-	return s.CloneAsCtl()
-}
-
-func (s *ResponseRewriterMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
+func (s *ResponseRewriterMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
 	return func(context *fw.Context) {
-		h(context)
+		ctx.Next(context)
 		result := new(Data[int])
 
 		switch context.GetFastContext().Response.StatusCode() {
@@ -41,20 +39,6 @@ func (s *ResponseRewriterMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerF
 		}
 
 	}
-}
-
-func (s *ResponseRewriterMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewResponseRewriteMiddleware()
-}
-
-func (s *ResponseRewriterMiddleware) HandlerController(base string) []*fw.RouteItem {
-	return []*fw.RouteItem{&fw.RouteItem{
-		Method:     "",
-		Path:       "",
-		IsHide:     false,
-		H:          nil,
-		Middleware: s,
-	}}
 }
 
 const responseRewriterName = "ResponseRewriter"

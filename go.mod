@@ -42,3 +42,6 @@ require (
 )
 
 replace github.com/linxlib/astp => ../../linxlib/astp
+replace (
+	github.com/linxlib/config => ../../linxlib/config
+)

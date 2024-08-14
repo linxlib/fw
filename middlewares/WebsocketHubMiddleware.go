@@ -8,7 +8,6 @@ import (
 	"github.com/valyala/fasthttp"
 	"log"
 	"math/rand/v2"
-	"net/url"
 )
 
 var _ fw.IMiddlewareCtl = (*WebsocketHubMiddleware)(nil)
@@ -40,30 +39,11 @@ type WebsocketHubMiddleware struct {
 	method  string
 }
 
-func (w *WebsocketHubMiddleware) CloneAsMethod() fw.IMiddlewareMethod {
-	return w.CloneAsCtl()
-}
-
-func (w *WebsocketHubMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewWebsocketHubMiddleware()
-}
-
-func (w *WebsocketHubMiddleware) HandlerController(h string) []*fw.RouteItem {
-
-	var p = w.GetParam()
-	values, err := url.ParseQuery(p)
-	if err != nil {
-		w.route = ""
-	} else {
-		w.route = values.Get("route")
-	}
-	if w.route != "" {
-		h = w.route
-	}
-
+func (w *WebsocketHubMiddleware) Router(ctx *fw.MiddlewareContext) []*fw.RouteItem {
+	w.route = ctx.GetParam("route")
 	return []*fw.RouteItem{&fw.RouteItem{
 		Method:     "ANY",
-		Path:       h,
+		Path:       w.route,
 		Middleware: w,
 		H: func(context *fw.Context) {
 			// 需要将hub注入到controller层
@@ -89,11 +69,9 @@ func (w *WebsocketHubMiddleware) HandlerController(h string) []*fw.RouteItem {
 		},
 	}}
 }
-
-func (w *WebsocketHubMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
+func (w *WebsocketHubMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
 	return func(context *fw.Context) {
 		context.Map(w.hub)
-		next(context)
+		ctx.Next(context)
 	}
-
 }

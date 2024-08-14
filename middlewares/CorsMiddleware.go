@@ -11,9 +11,20 @@ import (
 	"time"
 )
 
+var _ fw.IMiddlewareGlobal = (*CorsMiddleware)(nil)
+
 type CorsMiddleware struct {
 	*fw.MiddlewareGlobal
 	config Config
+}
+
+func (c *CorsMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
+	cors := newCors(c.config)
+	return func(context *fw.Context) {
+		if cors.applyCors(context) {
+			ctx.Next(context)
+		}
+	}
 }
 
 func NewDefaultCorsMiddleware() *CorsMiddleware {
@@ -29,30 +40,11 @@ func NewCorsMiddleware(config Config) *CorsMiddleware {
 		config:           config,
 	}
 }
-
-func (c *CorsMiddleware) CloneAsMethod() fw.IMiddlewareMethod {
-	return c.CloneAsCtl()
-}
-
-func (c *CorsMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
-	cors := newCors(c.config)
-	return func(context *fw.Context) {
-		if cors.applyCors(context) {
-			next(context)
-		}
-
-	}
-}
-
-func (c *CorsMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewCorsMiddleware(c.config)
-}
-
-func (c *CorsMiddleware) HandlerController(base string) []*fw.RouteItem {
+func (c *CorsMiddleware) Router(ctx *fw.MiddlewareContext) []*fw.RouteItem {
 	cors := newCors(c.config)
 	return []*fw.RouteItem{&fw.RouteItem{
 		Method: "OPTIONS",
-		Path:   base + "/{all:*}",
+		Path:   "/{all:*}",
 		IsHide: false,
 		H: func(context *fw.Context) {
 			cors.applyCors(context)

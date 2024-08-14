@@ -27,11 +27,7 @@ type WebsocketMiddleware struct {
 	upgrade websocket.FastHTTPUpgrader
 }
 
-func (w *WebsocketMiddleware) CloneAsMethod() fw.IMiddlewareMethod {
-	return NewWebsocketMiddleware()
-}
-
-func (w *WebsocketMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
+func (w *WebsocketMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
 	return func(context *fw.Context) {
 		err := w.upgrade.Upgrade(context.GetFastContext(), func(ws *websocket.Conn) {
 			defer ws.Close()
@@ -45,7 +41,7 @@ func (w *WebsocketMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc 
 				//这里拿到了ws的数据 需要去调用下一级的方法了
 				//将参数数据Map一下，在下一级调用时会自动映射进去
 				context.Map(message)
-				next(context)
+				ctx.Next(context)
 				// 调用完实际的方法之后，需要把该回写的数据拿过来处理了
 				result, ex1 := context.Get("fw_data")
 				resultErr, ex2 := context.Get("fw_err")
@@ -77,5 +73,4 @@ func (w *WebsocketMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc 
 			return
 		}
 	}
-
 }

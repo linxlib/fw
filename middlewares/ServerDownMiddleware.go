@@ -14,11 +14,7 @@ type ServerDownMiddleware struct {
 	serverDown bool
 }
 
-func (s *ServerDownMiddleware) CloneAsMethod() fw.IMiddlewareMethod {
-	return s.CloneAsCtl()
-}
-
-func (s *ServerDownMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
+func (s *ServerDownMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
 	return func(context *fw.Context) {
 		if s.serverDown {
 			resp, _ := http.Get("https://shuye.dev/maintenance-page/")
@@ -27,15 +23,11 @@ func (s *ServerDownMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
 			return
 		}
 
-		h(context)
+		ctx.Next(context)
 	}
 }
 
-func (s *ServerDownMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewServerDownMiddleware(s.key)
-}
-
-func (s *ServerDownMiddleware) HandlerController(s2 string) []*fw.RouteItem {
+func (s *ServerDownMiddleware) Router(ctx *fw.MiddlewareContext) []*fw.RouteItem {
 	return []*fw.RouteItem{&fw.RouteItem{
 		Method: "PATCH",
 		Path:   "/serverDown/{key}",

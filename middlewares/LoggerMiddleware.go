@@ -11,6 +11,8 @@ const (
 	loggerName = "Logger"
 )
 
+var _ fw.IMiddlewareGlobal = (*LoggerMiddleware)(nil)
+
 func NewLoggerMiddleware(logger *logrus.Logger) fw.IMiddlewareGlobal {
 	return &LoggerMiddleware{
 		MiddlewareGlobal: fw.NewMiddlewareGlobal(loggerName),
@@ -22,19 +24,7 @@ type LoggerMiddleware struct {
 	Logger *logrus.Logger `inject:""`
 }
 
-func (w *LoggerMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewLoggerMiddleware(w.Logger)
-}
-
-func (w *LoggerMiddleware) HandlerController(s string) []*fw.RouteItem {
-	return fw.EmptyRouteItem(w)
-}
-
-func (w *LoggerMiddleware) CloneAsMethod() fw.IMiddlewareMethod {
-	return w.CloneAsCtl()
-}
-
-func (w *LoggerMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
+func (w *LoggerMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
 	return func(context *fw.Context) {
 		fctx := context.GetFastContext()
 		start := time.Now()
@@ -47,7 +37,7 @@ func (w *LoggerMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
 		//}
 		params.ClientIP = fctx.RemoteIP().String()
 		params.Method = conv.String(fctx.Method())
-		next(context)
+		ctx.Next(context)
 		params.TimeStamp = time.Now()
 		params.Latency = params.TimeStamp.Sub(start)
 		params.StatusCode = fctx.Response.StatusCode()

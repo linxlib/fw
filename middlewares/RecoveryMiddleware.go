@@ -24,6 +24,8 @@ type RecoveryOptions struct {
 	Console bool
 }
 
+var _ fw.IMiddlewareGlobal = (*RecoveryMiddleware)(nil)
+
 // RecoveryMiddleware globally recover from panic
 type RecoveryMiddleware struct {
 	*fw.MiddlewareGlobal
@@ -32,11 +34,7 @@ type RecoveryMiddleware struct {
 	isDebug bool
 }
 
-func (s *RecoveryMiddleware) CloneAsMethod() fw.IMiddlewareMethod {
-	return s.CloneAsCtl()
-}
-
-func (s *RecoveryMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
+func (s *RecoveryMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
 	return func(context *fw.Context) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -91,17 +89,8 @@ func (s *RecoveryMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
 
 			}
 		}()
-		h(context)
+		ctx.Next(context)
 	}
-}
-
-func (s *RecoveryMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewRecoveryMiddleware(s.options, s.Logger)
-}
-
-func (s *RecoveryMiddleware) HandlerController(base string) []*fw.RouteItem {
-
-	return fw.EmptyRouteItem(s)
 }
 
 const recoveryName = "Recovery"

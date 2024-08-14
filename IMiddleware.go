@@ -1,79 +1,95 @@
 package fw
 
 import (
+	"github.com/linxlib/config"
 	"github.com/linxlib/fw/attribute"
-	"github.com/linxlib/inject"
+	"net/url"
 	"reflect"
+	"strings"
 )
 
 type AttributeName = string
 type SlotType = string
 
-// IMiddleware
-// interface of middleware
-type IMiddleware interface {
+type MiddlewareContext struct {
+	Location    SlotType
+	Param       map[SlotType]string
+	RValue      map[SlotType]reflect.Value
+	ParamValues url.Values
+	Ignored     bool
+	Next        HandlerFunc
+}
+
+func (m *MiddlewareContext) VisitParams(f func(key string, value []string)) {
+	for s, i := range m.ParamValues {
+		f(s, i)
+	}
+}
+
+func (m *MiddlewareContext) DelParam(key string) {
+	m.ParamValues.Del(key)
+}
+
+func (m *MiddlewareContext) SetRValue(v reflect.Value) {
+	m.RValue[m.Location] = v
+}
+
+func (m *MiddlewareContext) GetRValue() reflect.Value {
+	if ss, ok := m.RValue[m.Location]; ok {
+		return ss
+	} else {
+		return reflect.Value{}
+	}
+}
+
+func newMiddlewareContext(location SlotType, param string, next HandlerFunc) *MiddlewareContext {
+	m := &MiddlewareContext{Location: location, Next: next}
+	m.Param = make(map[SlotType]string)
+	m.RValue = make(map[SlotType]reflect.Value)
+	m.Param[location] = param
+	var err error
+	m.ParamValues, err = url.ParseQuery(param)
+	if err != nil {
+		m.ParamValues = make(url.Values)
+	}
+	return m
+}
+
+func (m *MiddlewareContext) GetParam(key string) string {
+	if ss, ok := m.ParamValues[key]; ok {
+		return strings.Join(ss, ",")
+	} else {
+		return ""
+	}
+}
+
+type IMiddlewareBase interface {
 	// Name returns middleware's name
 	Name() string
 	// Attribute returns middleware's Attribute just like Websocket so that you can use it like // @Websocket
 	Attribute() AttributeName
 	// GetSlot returns slot type
 	GetSlot() SlotType
-	// SetParam pass params (strings with query format) to middleware
-	SetParam(p string)
-	// GetParam return params string
-	GetParam() string
-
+}
+type IInitOnce interface {
+	DoInitOnce()
+}
+type IConfig interface {
+	setConfig(conf *config.Config)
+	LoadConfig(key string, config any)
+}
+type IReg interface {
 	// doReg inner called by fw middleware container
 	doReg()
-	Constructor(server inject.Provider)
-}
-type IMiddlewareMethod interface {
-	IMiddleware
-	// CloneAsMethod returns a copy from Middleware Container
-	CloneAsMethod() IMiddlewareMethod
-	// HandlerMethod will be called when wrap a method
-	HandlerMethod(next HandlerFunc) HandlerFunc
-	// GetMethodRValue returns the method's reflect value which called
-	GetMethodRValue() reflect.Value
-	SetMethodRValue(rv reflect.Value)
-
-	// HandlerIgnored will be called when a method is marked as @Ignore <ControllerMiddleware Attribute>
-	// only implement it when your middleware needs to handle @Ignore (like SessionMiddleware or AuthMiddleware)
-	HandlerIgnored(next HandlerFunc) HandlerFunc
-}
-type IMiddlewareCtl interface {
-	IMiddlewareMethod
-	// CloneAsCtl returns a copy from Middleware Container
-	CloneAsCtl() IMiddlewareCtl
-	// HandlerController will be called when handling controller
-	// returns many RouteItem(field `Path` is not empty) if you want to register a route
-	HandlerController(base string) []*RouteItem
-	// GetCtlRValue returns the controller's reflect value that the called method belongs to
-	GetCtlRValue() reflect.Value
-	SetCtlRValue(rv reflect.Value)
 }
 
-type IMiddlewareGlobal interface {
-	IMiddlewareCtl
-}
-
-type RouteItem struct {
-	Method     string            // HTTP METHOD
-	Path       string            // route path
-	IsHide     bool              // if set true, this route will not show in route table
-	H          HandlerFunc       // handler for this route
-	Middleware IMiddlewareMethod // just refer to middleware itself
-}
-
-// EmptyRouteItem returns an empty []*RouteItem which won't register any route
-func EmptyRouteItem(m IMiddlewareMethod) []*RouteItem {
-	return []*RouteItem{{
-		Method:     "",
-		Path:       "",
-		IsHide:     false,
-		H:          nil,
-		Middleware: m,
-	}}
+// IMiddleware
+// interface of middleware
+type IMiddleware interface {
+	IMiddlewareBase
+	IConfig
+	IInitOnce
+	IReg
 }
 
 var _ IMiddleware = (*Middleware)(nil)
@@ -86,40 +102,28 @@ func NewMiddleware(name string, slot string, attr string) *Middleware {
 	}
 }
 
-func NewMiddlewareMethod(name string, attr string) *MiddlewareMethod {
-	return &MiddlewareMethod{
-		Middleware: NewMiddleware(name, SlotMethod, attr),
-	}
-}
-func NewMiddlewareMethodForCtl(name string, attr string) *MiddlewareMethod {
-	return &MiddlewareMethod{
-		Middleware: NewMiddleware(name, SlotController, attr),
-	}
-}
-func NewMiddlewareCtl(name string, attr string) *MiddlewareCtl {
-	return &MiddlewareCtl{
-		MiddlewareMethod: NewMiddlewareMethodForCtl(name, attr),
-	}
-}
-
-func NewMiddlewareGlobal(name string) *MiddlewareGlobal {
-	return &MiddlewareGlobal{
-		Middleware: NewMiddleware(name, SlotGlobal, ""),
-	}
-}
-
 type Middleware struct {
-	slot  string
-	name  string
-	attr  string
-	param string
+	slot   string
+	name   string
+	attr   string
+	param  string
+	config *config.Config
 }
 
-func (m *Middleware) Constructor(server inject.Provider) {
+func (m *Middleware) LoadConfig(key string, config any) {
+	_ = m.config.LoadWithKey(key, config)
+}
+
+func (m *Middleware) setConfig(conf *config.Config) {
+	m.config = conf
+}
+
+func (m *Middleware) DoInitOnce() {
 
 }
 
 func (m *Middleware) doReg() {
+
 	switch m.slot {
 	case SlotMethod:
 		attribute.RegAttributeType(m.attr, attribute.TypeMiddleware)
@@ -130,22 +134,6 @@ func (m *Middleware) doReg() {
 	default:
 
 	}
-}
-
-func (m *Middleware) GetParam() string {
-	return m.param
-}
-
-func (m *Middleware) SetName(name string) {
-	m.name = name
-}
-
-func (m *Middleware) SetAttribute(attr AttributeName) {
-	m.attr = attr
-}
-
-func (m *Middleware) SetSlot(slotType SlotType) {
-	m.slot = slotType
 }
 
 func (m *Middleware) Name() string {
@@ -160,59 +148,94 @@ func (m *Middleware) GetSlot() SlotType {
 	return m.slot
 }
 
-func (m *Middleware) SetParam(p string) {
-	m.param = p
+type IMiddlewareMethod interface {
+	IMiddleware
+	Execute(ctx *MiddlewareContext) HandlerFunc
+}
+
+type IMiddlewareCtl interface {
+	IMiddlewareMethod
+	Router(ctx *MiddlewareContext) []*RouteItem
+}
+
+type RouteItem struct {
+	Method     string         // HTTP METHOD
+	Path       string         // route path
+	IsHide     bool           // if set true, this route will not show in route table
+	H          HandlerFunc    // handler for this route
+	Middleware IMiddlewareCtl // just refer to middleware itself
+}
+
+// emptyRouteItem returns an empty []*RouteItem which won't register any route
+func emptyRouteItem(m IMiddlewareCtl) []*RouteItem {
+	return []*RouteItem{{
+		Method:     "",
+		Path:       "",
+		IsHide:     false,
+		H:          nil,
+		Middleware: m,
+	}}
+}
+
+func NewMiddlewareMethodForCtl(name string, attr string) *MiddlewareMethod {
+	return &MiddlewareMethod{
+		Middleware: NewMiddleware(name, SlotController, attr),
+	}
+}
+func NewMiddlewareMethodForGlobal(name string) *MiddlewareMethod {
+	return &MiddlewareMethod{
+		Middleware: NewMiddleware(name, SlotGlobal, name),
+	}
+}
+
+func NewMiddlewareCtlForGlobal(name string) *MiddlewareCtl {
+	return &MiddlewareCtl{
+		MiddlewareMethod: NewMiddlewareMethodForGlobal(name),
+	}
+}
+
+func NewMiddlewareCtl(name string, attr string) *MiddlewareCtl {
+	return &MiddlewareCtl{
+		MiddlewareMethod: NewMiddlewareMethodForCtl(name, attr),
+	}
 }
 
 type MiddlewareCtl struct {
 	*MiddlewareMethod
-	rValueCtl reflect.Value
 }
 
-func (m *MiddlewareCtl) GetCtlRValue() reflect.Value {
-	return m.rValueCtl
+func (m *MiddlewareCtl) Execute(ctx *MiddlewareContext) HandlerFunc {
+	return func(context *Context) {
+		ctx.Next(context)
+	}
 }
-func (m *MiddlewareCtl) SetCtlRValue(v reflect.Value) {
-	m.rValueCtl = v
+
+func (m *MiddlewareCtl) Router(ctx *MiddlewareContext) []*RouteItem {
+	return emptyRouteItem(m)
+}
+
+func NewMiddlewareMethod(name string, attr string) *MiddlewareMethod {
+	return &MiddlewareMethod{
+		Middleware: NewMiddleware(name, SlotMethod, attr),
+	}
 }
 
 type MiddlewareMethod struct {
 	*Middleware
-	rValueMethod reflect.Value
 }
 
-func (m *MiddlewareMethod) GetMethodRValue() reflect.Value {
-	return m.rValueMethod
+type IMiddlewareGlobal interface {
+	IMiddlewareCtl
 }
-func (m *MiddlewareMethod) SetMethodRValue(v reflect.Value) {
-	m.rValueMethod = v
-}
-func (m *MiddlewareMethod) HandlerIgnored(nextHandlerFunc HandlerFunc) HandlerFunc {
-	return nextHandlerFunc
+
+func NewMiddlewareGlobal(name string) *MiddlewareGlobal {
+	return &MiddlewareGlobal{
+		MiddlewareCtl: NewMiddlewareCtlForGlobal(name),
+	}
 }
 
 type MiddlewareGlobal struct {
-	*Middleware
-}
-
-func (m *MiddlewareGlobal) GetMethodRValue() reflect.Value {
-	return reflect.Value{}
-}
-
-func (m *MiddlewareGlobal) SetMethodRValue(rv reflect.Value) {
-
-}
-
-func (m *MiddlewareGlobal) GetCtlRValue() reflect.Value {
-	return reflect.Value{}
-}
-
-func (m *MiddlewareGlobal) SetCtlRValue(rv reflect.Value) {
-
-}
-
-func (m *MiddlewareGlobal) HandlerIgnored(nextHandlerFunc HandlerFunc) HandlerFunc {
-	return nextHandlerFunc
+	*MiddlewareCtl
 }
 
 const (

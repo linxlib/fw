@@ -55,6 +55,9 @@ func isASCII(s string) bool {
 
 func joinRoute(base string, r string) string {
 	var result = base
+	if result == "" {
+		result += "/"
+	}
 	if r == "/" || r == "" {
 
 		if strings.HasSuffix(result, "/") && result != "/" {

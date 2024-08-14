@@ -7,7 +7,6 @@ import (
 	"github.com/linxlib/fw"
 	"github.com/sirupsen/logrus"
 	"net/http"
-	"net/url"
 	"time"
 )
 
@@ -90,6 +89,8 @@ func NewLogMiddleware(logger *logrus.Logger) fw.IMiddlewareCtl {
 	}
 }
 
+var _ fw.IMiddlewareCtl = (*LogMiddleware)(nil)
+
 // LogMiddleware
 // for logging request info.
 // can be used on Controller or Method
@@ -100,26 +101,8 @@ type LogMiddleware struct {
 	realIPHeader string
 }
 
-func (w *LogMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewLogMiddleware(w.Logger)
-}
-
-func (w *LogMiddleware) HandlerController(s string) []*fw.RouteItem {
-	return fw.EmptyRouteItem(w)
-}
-
-func (w *LogMiddleware) CloneAsMethod() fw.IMiddlewareMethod {
-	return w.CloneAsCtl()
-}
-
-func (w *LogMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
-	var p = w.GetParam()
-	values, err := url.ParseQuery(p)
-	if err != nil {
-		w.realIPHeader = ""
-	} else {
-		w.realIPHeader = values.Get("real_ip_header")
-	}
+func (w *LogMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
+	w.realIPHeader = ctx.GetParam("real_ip_header")
 	return func(context *fw.Context) {
 		fctx := context.GetFastContext()
 		start := time.Now()
@@ -132,7 +115,7 @@ func (w *LogMiddleware) HandlerMethod(next fw.HandlerFunc) fw.HandlerFunc {
 		}
 		params.ClientIP = fctx.RemoteIP().String()
 		params.Method = conv.String(fctx.Method())
-		next(context)
+		ctx.Next(context)
 		params.TimeStamp = time.Now()
 		params.Latency = params.TimeStamp.Sub(start)
 		params.StatusCode = fctx.Response.StatusCode()

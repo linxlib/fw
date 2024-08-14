@@ -6,7 +6,6 @@ import (
 	"github.com/linxlib/conv"
 	"github.com/linxlib/fw"
 	"net/http"
-	"net/url"
 	"strconv"
 )
 
@@ -65,76 +64,58 @@ type BasicAuthMiddleware struct {
 	pairs authPairs
 }
 
-func (b *BasicAuthMiddleware) CloneAsMethod() fw.IMiddlewareMethod {
-	return b.CloneAsCtl()
-}
-
-func (b *BasicAuthMiddleware) HandlerMethod(h fw.HandlerFunc) fw.HandlerFunc {
-	var p = b.GetParam()
-	values, err := url.ParseQuery(p)
-	if err != nil {
-		panic("BasicAuthMiddleware: param for this middleware is invalid, should like `@BasicAuth proxy=true&realm=xxx&user1=pass1&user2=pass2`")
-	} else {
-		if v := values.Get("proxy"); v != "" {
-			b.proxy = v == "true"
-		}
-		if v := values.Get("realm"); v != "" {
-			b.realm = v
-		}
-		if b.realm == "" {
-			if b.proxy {
-				b.realm = "Proxy Authorization Required"
-			} else {
-				b.realm = "Authorization Required"
-			}
-		}
-		b.realm = "Basic realm=" + strconv.Quote(b.realm)
-		values.Del("realm")
-		t := map[string][]string(values)
-		accounts := make(Accounts)
-		for s, strings := range t {
-			accounts[s] = strings[0]
-		}
-		b.pairs = processAccounts(accounts)
-
+func (b *BasicAuthMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
+	if v := ctx.GetParam("proxy"); v != "" {
+		b.proxy = v == "true"
+	}
+	ctx.DelParam("proxy")
+	if v := ctx.GetParam("realm"); v != "" {
+		b.realm = v
+	}
+	if b.realm == "" {
 		if b.proxy {
-			return func(context *fw.Context) {
-				bs := context.GetFastContext().Request.Header.Peek("Proxy-Authorization")
-				proxyUser, found := b.pairs.searchCredential(string(bs))
-				if !found {
-					// Credentials doesn't match, we return 407 and abort handlers chain.
-					context.GetFastContext().Response.Header.Set("Proxy-Authenticate", b.realm)
-					context.GetFastContext().Response.SetStatusCode(http.StatusProxyAuthRequired)
-					return
-				}
-				context.Set(AuthProxyUserKey, proxyUser)
-				h(context)
-			}
-		} else { //basic auth
-			return func(context *fw.Context) {
-				bs := context.GetFastContext().Request.Header.Peek("Authorization")
-				user, found := b.pairs.searchCredential(string(bs))
-				if !found {
-					// Credentials doesn't match, we return 407 and abort handlers chain.
-					context.GetFastContext().Response.Header.Set("WWW-Authenticate", b.realm)
-					context.GetFastContext().Response.SetStatusCode(http.StatusUnauthorized)
-					return
-				}
-				context.Set(AuthUserKey, user)
-				h(context)
-			}
+			b.realm = "Proxy Authorization Required"
+		} else {
+			b.realm = "Authorization Required"
 		}
+	}
+	b.realm = "Basic realm=" + strconv.Quote(b.realm)
+	ctx.DelParam("realm")
+	accounts := make(Accounts)
+	ctx.VisitParams(func(key string, value []string) {
+		accounts[key] = value[0]
+	})
 
+	b.pairs = processAccounts(accounts)
+
+	if b.proxy {
+		return func(context *fw.Context) {
+			bs := context.GetFastContext().Request.Header.Peek("Proxy-Authorization")
+			proxyUser, found := b.pairs.searchCredential(conv.String(bs))
+			if !found {
+				// Credentials doesn't match, we return 407 and abort handlers chain.
+				context.GetFastContext().Response.Header.Set("Proxy-Authenticate", b.realm)
+				context.GetFastContext().Response.SetStatusCode(http.StatusProxyAuthRequired)
+				return
+			}
+			context.Set(AuthProxyUserKey, proxyUser)
+			ctx.Next(context)
+		}
+	} else { //basic auth
+		return func(context *fw.Context) {
+			bs := context.GetFastContext().Request.Header.Peek("Authorization")
+			user, found := b.pairs.searchCredential(conv.String(bs))
+			if !found {
+				// Credentials doesn't match, we return 407 and abort handlers chain.
+				context.GetFastContext().Response.Header.Set("WWW-Authenticate", b.realm)
+				context.GetFastContext().Response.SetStatusCode(http.StatusUnauthorized)
+				return
+			}
+			context.Set(AuthUserKey, user)
+			ctx.Next(context)
+		}
 	}
 
-}
-
-func (b *BasicAuthMiddleware) CloneAsCtl() fw.IMiddlewareCtl {
-	return NewBasicAuthMiddleware()
-}
-
-func (b *BasicAuthMiddleware) HandlerController(base string) []*fw.RouteItem {
-	return fw.EmptyRouteItem(b)
 }
 
 func NewBasicAuthMiddleware() fw.IMiddlewareCtl {

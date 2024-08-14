@@ -14,7 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"log"
 	"os"
 	"reflect"
 	"runtime"
@@ -74,10 +73,14 @@ func New() *Server {
 		AutoReload:         true,
 		Silent:             true,
 		ENVPrefix:          "FW",
+		Files:              []string{"config/config.yaml"},
 		AutoReloadInterval: time.Second * 5,
+		AutoReloadCallback: func(key string, config interface{}) {
+			fmt.Println("key=", key, "config=", config)
+		},
 	})
 	s.option.IntranetIP = getIntranetIP()
-	err := s.conf.Load(s.option, "config/config.yaml")
+	err := s.conf.Load(s.option)
 	if err != nil {
 		panic(err)
 	}
@@ -183,7 +186,7 @@ type Server struct {
 	middleware         *MiddlewareContainer
 	logger             *logrus.Logger
 	once               sync.Once
-	midGlobals         []IMiddlewareMethod
+	midGlobals         []IMiddlewareCtl
 	hookHandler        HookHandler
 	routerTreeForPrint map[string][][2]string
 	start              time.Time
@@ -235,21 +238,26 @@ func (s *Server) RegisterRoute(controller any) {
 	// 处理全局
 
 	s.once.Do(func() {
-		s.midGlobals = make([]IMiddlewareMethod, 0)
-		m0 := s.handleGlobal(s.option.BasePath)
-		for _, item := range m0 {
-			s.midGlobals = append(s.midGlobals, item.Middleware)
-			if item.Path != "" {
-
-				err := s.registerRoute(item.Method, item.Path, item.H)
+		s.midGlobals = make([]IMiddlewareCtl, 0)
+		routeItems := make([]*RouteItem, 0)
+		s.middleware.GetGlobal(func(mid IMiddlewareGlobal) bool {
+			ctx := newMiddlewareContext(SlotGlobal, "", nil)
+			r := mid.Router(ctx)
+			if r != nil {
+				routeItems = append(routeItems, r...)
+			}
+			s.midGlobals = append(s.midGlobals, mid)
+			return false
+		})
+		for _, item := range routeItems {
+			if item.Path != "" && item.Method != "" {
+				err := s.registerRoute(item.Method, joinRoute(s.option.BasePath, item.Path), item.H)
 				if err != nil {
 					panic(err)
 				}
 				if !item.IsHide {
-
-					s.addRouteTable("Global", item.Method, item.Path, item.Middleware.Name()+".H", "@"+item.Middleware.Name())
+					s.addRouteTable("Global", item.Method, joinRoute(s.option.BasePath, item.Path), item.Middleware.Name()+".H", "@"+item.Middleware.Name())
 				}
-
 			}
 		}
 	})
@@ -273,19 +281,30 @@ func (s *Server) RegisterRoute(controller any) {
 		ctl.SetValue(refVal.Interface())
 		ctl.SetRType(typ)
 		//处理控制器
-		m := s.handleCtl(base, ctl)
+		middlewareCtls := make([]IMiddlewareCtl, 0)
+		routeItems := make([]*RouteItem, 0)
+		attrs1 := attribute.GetStructAttrAsMiddleware(ctl)
+		for _, attr := range attrs1 {
+			if mid, ok := s.middleware.GetByAttributeCtl(attr.Name); ok {
+				ctx := newMiddlewareContext(SlotController, attr.Value, nil)
+				ctx.SetRValue(ctl.GetRValue())
+				r := mid.Router(ctx)
+				if r != nil {
+					routeItems = append(routeItems, r...)
+				}
+				middlewareCtls = append(middlewareCtls, mid)
 
-		mids := make([]IMiddlewareMethod, 0)
+			}
+		}
 
-		for _, item := range m {
-			mids = append(mids, item.Middleware)
-			if item.Path != "" {
-				err := s.registerRoute(item.Method, item.Path, item.H)
+		for _, item := range routeItems {
+			if item.Path != "" && item.Method != "" {
+				err := s.registerRoute(item.Method, joinRoute(base, item.Path), item.H)
 				if err != nil {
 					continue
 				}
 				if !item.IsHide {
-					s.addRouteTable(ctl.Name, item.Method, item.Path, ctl.Name, "@"+item.Middleware.Attribute())
+					s.addRouteTable(ctl.Name, item.Method, joinRoute(base, item.Path), ctl.Name, "@"+item.Middleware.Attribute())
 				}
 			}
 		}
@@ -320,23 +339,21 @@ func (s *Server) RegisterRoute(controller any) {
 			// 先处理方法上标记的中间件
 			attrs, next := s.handle(method)
 			// 然后处理controller上的中间件
-			for _, mid := range mids {
-				mid.SetMethodRValue(method.GetRValue())
+			for _, mid := range middlewareCtls {
+				attrs = append(attrs, mid.Attribute())
+				ctx := newMiddlewareContext(SlotController, "", next)
+				ctx.SetRValue(method.GetRValue())
 				// 如果方法上打了 @Ignore Auth 则需要忽略 Auth这个代表 AuthMiddleware 的中间件
 				//TODO: 是否需要处理 @Ignore 多个的情况？
 				if toIgnore == strings.ToUpper(mid.Attribute()) {
-					// 一个中间件被忽略，则忽略调用其 HandlerMethod，改为调用 HandlerIgnored
-					next = mid.HandlerIgnored(next)
-					continue
+					ctx.Ignored = true
 				}
-				attrs = append(attrs, mid.Attribute())
-				next = mid.HandlerMethod(next)
+				next = mid.Execute(ctx)
 			}
 			// 这里全局的中间件 仅针对于方法，不会对Controller做出改变
 			for _, global := range s.midGlobals {
-				//global的中间件一般是没有attr的，因此暂不处理
-				//attrs = append(attrs, global.Attribute())
-				next = global.HandlerMethod(next)
+				ctx := newMiddlewareContext(SlotGlobal, "", next)
+				next = global.Execute(ctx)
 			}
 
 			sig := strings.Builder{}
@@ -443,39 +460,6 @@ func (s *Server) wrapM(handler *astp.Element) HandlerFunc {
 	}
 }
 
-func (s *Server) handleGlobal(base string) []*RouteItem {
-	result := make([]*RouteItem, 0)
-	s.middleware.GetGlobal(func(mid IMiddlewareGlobal) bool {
-		mid = mid.CloneAsCtl()
-		r := mid.HandlerController(base)
-		if r != nil {
-			result = append(result, r...)
-		}
-
-		return false
-	})
-	return result
-}
-
-func (s *Server) handleCtl(base string, ctl *astp.Element) []*RouteItem {
-	result := make([]*RouteItem, 0)
-	attrs1 := attribute.GetStructAttrAsMiddleware(ctl)
-	for _, attr := range attrs1 {
-		if mid, ok := s.middleware.GetByAttributeCtl(attr.Name); ok {
-			// 拷贝一份 表示这份实例唯此控制器独享
-			mid = mid.CloneAsCtl()
-			mid.SetParam(attr.Value)
-			mid.SetCtlRValue(ctl.GetRValue())
-			r := mid.HandlerController(base)
-			if r != nil {
-				result = append(result, r...)
-			}
-
-		}
-	}
-	return result
-}
-
 func (s *Server) handle(handler *astp.Element) ([]string, HandlerFunc) {
 	//先把实际的方法wrap成HandlerFunc
 	next := s.wrapM(handler)
@@ -485,11 +469,10 @@ func (s *Server) handle(handler *astp.Element) ([]string, HandlerFunc) {
 	for _, attr := range attrs {
 		if mid, ok := s.middleware.GetByAttributeMethod(attr.Name); ok {
 			attrs1 = append(attrs1, mid.Attribute())
-			// 拷贝一份副本 让中间件对于此上下文唯一
-			mid = mid.CloneAsMethod()
-			mid.SetParam(attr.Value)
-			mid.SetMethodRValue(handler.GetRValue())
-			next = mid.HandlerMethod(next)
+
+			ctx := newMiddlewareContext(SlotMethod, attr.Value, next)
+			ctx.SetRValue(handler.GetRValue())
+			next = mid.Execute(ctx)
 		}
 	}
 	return attrs1, next
@@ -542,16 +525,7 @@ func (s *Server) addRouteTable(controllerName, method, routePath, methodName, si
 	}
 }
 
-func (s *Server) Run() {
-	if s.hookHandler != nil {
-		for _, file := range s.parser.Files {
-			if !file.IsMain() {
-				continue
-			}
-
-			s.hookHandler.HandleServerInfo(file.Comments)
-		}
-	}
+func (s *Server) printRoute() {
 	var node = pterm.TreeNode{
 		Text: "FW Server",
 	}
@@ -568,21 +542,10 @@ func (s *Server) Run() {
 		}
 		node.Children = append(node.Children, no)
 	}
-	pterm.DefaultTree.WithRoot(node).Render()
-	s.server.Handler = s.router.Handler
-	s.server.StreamRequestBody = true
-	s.server.Name = s.option.Name
+	_ = pterm.DefaultTree.WithRoot(node).Render()
+}
 
-	done := make(chan bool)
-	go func() {
-		err := s.server.ListenAndServe(fmt.Sprintf("%s:%d", s.option.Listen, s.option.Port))
-		if err != nil {
-			internal.Errorf("Failed to start server: %v", err)
-			done <- true
-			return
-		}
-	}()
-
+func (s *Server) printInfo() {
 	style := pterm.NewStyle(pterm.FgLightGreen, pterm.Bold)
 	style1 := pterm.NewStyle(pterm.FgLightGreen)
 	style2 := pterm.NewStyle(pterm.FgDarkGray)
@@ -610,6 +573,35 @@ func (s *Server) Run() {
 			internal.Note("press CTRL+C to exit...")
 		}
 	}
+}
+
+func (s *Server) Start() {
+	if s.hookHandler != nil {
+		for _, file := range s.parser.Files {
+			if !file.IsMain() {
+				continue
+			}
+			s.hookHandler.HandleServerInfo(file.Comments)
+		}
+	}
+
+	s.printRoute()
+
+	s.server.Handler = s.router.Handler
+	s.server.StreamRequestBody = true
+	s.server.Name = s.option.Name
+
+	done := make(chan bool)
+	go func() {
+		err := s.server.ListenAndServe(fmt.Sprintf("%s:%d", s.option.Listen, s.option.Port))
+		if err != nil {
+			internal.Errorf("Failed to start server: %v", err)
+			done <- true
+			return
+		}
+	}()
+
+	s.printInfo()
 	for {
 		select {
 		case <-done:
@@ -625,10 +617,8 @@ const (
 // Use register middleware to server.
 // you can only use the @'Attribute' after register a middleware
 func (s *Server) Use(middleware IMiddleware) {
-	err := s.Apply(middleware)
-	if err != nil {
-		log.Println(err)
-	}
-	middleware.Constructor(s.Injector)
+	middleware.setConfig(s.conf)
+	_ = s.Apply(middleware)
+	middleware.DoInitOnce()
 	s.middleware.Reg(middleware)
 }
