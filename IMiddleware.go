@@ -12,12 +12,14 @@ type AttributeName = string
 type SlotType = string
 
 type MiddlewareContext struct {
-	Location    SlotType
-	Param       map[SlotType]string
-	RValue      map[SlotType]reflect.Value
-	ParamValues url.Values
-	Ignored     bool
-	Next        HandlerFunc
+	ControllerName string
+	MethodName     string
+	Location       SlotType
+	Param          map[SlotType]string
+	RValue         map[SlotType]reflect.Value
+	ParamValues    url.Values
+	Ignored        bool
+	Next           HandlerFunc
 }
 
 func (m *MiddlewareContext) VisitParams(f func(key string, value []string)) {
@@ -42,8 +44,8 @@ func (m *MiddlewareContext) GetRValue() reflect.Value {
 	}
 }
 
-func newMiddlewareContext(location SlotType, param string, next HandlerFunc) *MiddlewareContext {
-	m := &MiddlewareContext{Location: location, Next: next}
+func newMiddlewareContext(ctlName, methodName string, location SlotType, param string, next HandlerFunc) *MiddlewareContext {
+	m := &MiddlewareContext{ControllerName: ctlName, MethodName: methodName, Location: location, Next: next}
 	m.Param = make(map[SlotType]string)
 	m.RValue = make(map[SlotType]reflect.Value)
 	m.Param[location] = param
@@ -205,9 +207,7 @@ type MiddlewareCtl struct {
 }
 
 func (m *MiddlewareCtl) Execute(ctx *MiddlewareContext) HandlerFunc {
-	return func(context *Context) {
-		ctx.Next(context)
-	}
+	return ctx.Next
 }
 
 func (m *MiddlewareCtl) Router(ctx *MiddlewareContext) []*RouteItem {

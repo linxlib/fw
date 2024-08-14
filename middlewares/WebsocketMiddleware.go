@@ -2,8 +2,10 @@ package middlewares
 
 import (
 	"errors"
+	"fmt"
 	"github.com/fasthttp/websocket"
 	"github.com/linxlib/fw"
+	"github.com/valyala/fasthttp"
 	"log"
 )
 
@@ -15,7 +17,11 @@ const websocketName = "Websocket"
 func NewWebsocketMiddleware() fw.IMiddlewareMethod {
 	mw := &WebsocketMiddleware{
 		MiddlewareMethod: fw.NewMiddlewareMethod(websocketName, websocketAttr),
-		upgrade:          websocket.FastHTTPUpgrader{},
+		upgrade: websocket.FastHTTPUpgrader{
+			CheckOrigin: func(ctx *fasthttp.RequestCtx) bool {
+				return true
+			},
+		},
 	}
 
 	return mw
@@ -29,6 +35,7 @@ type WebsocketMiddleware struct {
 
 func (w *WebsocketMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
 	return func(context *fw.Context) {
+		fmt.Println(ctx.ControllerName, ctx.MethodName)
 		err := w.upgrade.Upgrade(context.GetFastContext(), func(ws *websocket.Conn) {
 			defer ws.Close()
 			for {

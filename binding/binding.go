@@ -5,6 +5,7 @@ import (
 	"github.com/gookit/validate/locales/zhcn"
 	"github.com/linxlib/fw/attribute"
 	"github.com/valyala/fasthttp"
+	"strings"
 )
 
 // Content-Type MIME of the most common data formats.
@@ -136,32 +137,11 @@ func Get(cmd string) Binding {
 	case "json", "body":
 		return JSON
 	default:
-		return nil
+		return JSON
 	}
 }
 func GetByAttr(attr *attribute.Attribute) Binding {
-	switch attr.Name {
-	case "Cookie":
-		return Cookie
-	case "Path":
-		return Path
-	case "Header":
-		return Header
-	case "Plain":
-		return Plain
-	case "Query":
-		return Query
-	case "Form":
-		return Form
-	case "Multipart":
-		return FormMultipart
-	case "Xml":
-		return XML
-	case "Json", "Body":
-		return JSON
-	default:
-		return JSON
-	}
+	return Get(strings.ToLower(attr.Name))
 }
 
 func validate(obj any) error {
