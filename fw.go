@@ -85,17 +85,56 @@ func New() *Server {
 		panic(err)
 	}
 	pterm.DefaultHeader.WithBackgroundStyle(pterm.NewStyle(pterm.BgBlack)).WithFullWidth().Println("FW for golang developers")
+
+	s.configLogger()
+
+	s.Map(s.option)
+	s.Map(s.conf)
+
+	s.Map(s)
+	if !internal.FileIsExist(s.option.AstFile) {
+		if s.option.Dev {
+			parser := astp.NewParser()
+			parser.Parse()
+			_ = parser.WriteOut(s.option.AstFile)
+		} else {
+			panic(fmt.Sprintf("%s not found, please generate it first!", s.option.AstFile))
+		}
+	}
+
+	s.parser.Load(s.option.AstFile)
+	return s
+}
+
+type Server struct {
+	inject.Injector
+	server     *fasthttp.Server
+	router     *router.Router
+	option     *ServerOption
+	conf       *config.Config
+	parser     *astp.Parser
+	middleware *MiddlewareContainer
+	logger     *logrus.Logger
+	once       sync.Once
+	midGlobals []IMiddlewareCtl
+	//TODO: multiple hooks
+	hookHandler        HookHandler
+	routerTreeForPrint map[string][][2]string
+	start              time.Time
+}
+
+func (s *Server) configLogger() {
 	logger := logrus.New()
 	logger.SetOutput(os.Stdout)
 	logger.SetFormatter(Console())
 	logger.SetLevel(logrus.InfoLevel)
 	logger.SetReportCaller(true)
 
-	defer func() {
-		if err := recover(); err != nil {
-			logger.Error(err)
-		}
-	}()
+	//defer func() {
+	//	if err := recover(); err != nil {
+	//		logger.Error(err)
+	//	}
+	//}()
 
 	logger.SetLevel(logrus.Level(s.option.Logger.LoggerLevel))
 	dir := s.option.Logger.LogDir
@@ -157,41 +196,8 @@ func New() *Server {
 	}
 
 	s.logger = logger
-
-	s.Map(s.option)
-	s.Map(s.conf)
 	s.Map(s.logger)
-	s.Map(s)
-	if !internal.FileIsExist(s.option.AstFile) {
-		if s.option.Dev {
-			parser := astp.NewParser()
-			parser.Parse()
-			_ = parser.WriteOut(s.option.AstFile)
-		} else {
-			panic(fmt.Sprintf("%s not found, please generate it first!", s.option.AstFile))
-		}
-	}
-
-	s.parser.Load(s.option.AstFile)
-	return s
 }
-
-type Server struct {
-	inject.Injector
-	server             *fasthttp.Server
-	router             *router.Router
-	option             *ServerOption
-	conf               *config.Config
-	parser             *astp.Parser
-	middleware         *MiddlewareContainer
-	logger             *logrus.Logger
-	once               sync.Once
-	midGlobals         []IMiddlewareCtl
-	hookHandler        HookHandler
-	routerTreeForPrint map[string][][2]string
-	start              time.Time
-}
-
 func (s *Server) RegisterHooks(handler HookHandler) {
 	s.hookHandler = handler
 }
@@ -221,6 +227,10 @@ const controllerAttr = "Controller"
 const controllerRoute = "Route"
 
 func (s *Server) RegisterRoute(controller any) {
+
+	if v, ok := controller.(IController); ok {
+		v.Init(s)
+	}
 	//defer func() {
 	//	if err := recover(); err != nil {
 	//		s.logger.Error(err)
@@ -557,11 +567,11 @@ func (s *Server) printInfo() {
 	style3.Println(time.Now().Sub(s.start).String())
 
 	//color.Printf("%s %s %s\n", color.HiGreen.Sprintf("FW %s", Version), color.Gray.Sprint("ready in"), color.HiWhite.Sprint("568ms"))
-	style.Print("➜ ")
-	style3.Printf("%-10s", "Local: ")
+	style.Print("  ➜ ")
+	style3.Printf("%10s", "Local: ")
 	style4.Printf("http://%s:%d%s\n", "localhost", s.option.Port, s.option.BasePath)
-	style.Print("➜ ")
-	style3.Printf("%-10s", "Network: ")
+	style.Print("  ➜ ")
+	style3.Printf("%10s", "Network: ")
 	style4.Printf("http://%s:%d%s\n", s.option.IntranetIP, s.option.Port, s.option.BasePath)
 	if s.hookHandler != nil {
 		s.hookHandler.Print(AfterListen)
@@ -621,4 +631,12 @@ func (s *Server) Use(middleware IMiddleware) {
 	_ = s.Apply(middleware)
 	middleware.DoInitOnce()
 	s.middleware.Reg(middleware)
+}
+
+func (s *Server) UseMapper(mapper ServiceMapper) {
+	result, err := mapper.Init(s.conf)
+	if err != nil {
+		panic(err)
+	}
+	s.Map(result)
 }

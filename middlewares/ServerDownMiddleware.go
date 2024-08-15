@@ -10,8 +10,18 @@ import (
 // ServerDownMiddleware is a middleware which provides an api to mark server down.
 type ServerDownMiddleware struct {
 	*fw.MiddlewareGlobal
-	key        string
+	sdo        *ServerDownOption
 	serverDown bool
+}
+
+type ServerDownOption struct {
+	Method string `yaml:"method" default:"PATCH"`
+	Path   string `yaml:"path" default:"/serverDown/{key}"`
+	Key    string `yaml:"key" default:""`
+}
+
+func (s *ServerDownMiddleware) DoInitOnce() {
+	s.LoadConfig("serverDown", s.sdo)
 }
 
 func (s *ServerDownMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
@@ -28,6 +38,9 @@ func (s *ServerDownMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc
 }
 
 func (s *ServerDownMiddleware) Router(ctx *fw.MiddlewareContext) []*fw.RouteItem {
+	if s.sdo.Key == "" {
+		return nil
+	}
 	return []*fw.RouteItem{&fw.RouteItem{
 		Method: "PATCH",
 		Path:   "/serverDown/{key}",
@@ -35,7 +48,7 @@ func (s *ServerDownMiddleware) Router(ctx *fw.MiddlewareContext) []*fw.RouteItem
 		H: func(context *fw.Context) {
 			str := context.GetFastContext().UserValue("key").(string)
 			str = strings.TrimSpace(str)
-			if str == s.key {
+			if str == s.sdo.Key {
 				s.serverDown = !s.serverDown
 			}
 			context.String(200, "ok")
@@ -46,10 +59,9 @@ func (s *ServerDownMiddleware) Router(ctx *fw.MiddlewareContext) []*fw.RouteItem
 
 const serverDownName = "ServerDown"
 
-func NewServerDownMiddleware(key string) fw.IMiddlewareGlobal {
-
+func NewServerDownMiddleware() fw.IMiddlewareGlobal {
 	return &ServerDownMiddleware{
-		key:              key,
+		sdo:              new(ServerDownOption),
 		MiddlewareGlobal: fw.NewMiddlewareGlobal(serverDownName),
 	}
 }
