@@ -22,12 +22,20 @@ type MiddlewareContext struct {
 	Next           HandlerFunc
 }
 
+// VisitParams calls the given function f for each key/value pair in
+// middleware context's parameters.
+//
+// f is called with the key and value of each parameter. The value is a slice
+// of strings.
 func (m *MiddlewareContext) VisitParams(f func(key string, value []string)) {
+	// Iterate over all key/value pairs in the parameters.
 	for s, i := range m.ParamValues {
 		f(s, i)
 	}
 }
 
+// DelParam deletes the value associated with key from middleware context's
+// parameters.
 func (m *MiddlewareContext) DelParam(key string) {
 	m.ParamValues.Del(key)
 }
@@ -44,6 +52,12 @@ func (m *MiddlewareContext) GetRValue() reflect.Value {
 	}
 }
 
+// newMiddlewareContext creates a new MiddlewareContext instance.
+//
+// ctlName is the name of the controller, methodName is the name of the method,
+// location is the location of the middleware, param is the parameter string,
+// and next is the next handler function in the chain.
+// Returns a pointer to a MiddlewareContext instance.
 func newMiddlewareContext(ctlName, methodName string, location SlotType, param string, next HandlerFunc) *MiddlewareContext {
 	m := &MiddlewareContext{ControllerName: ctlName, MethodName: methodName, Location: location, Next: next}
 	m.Param = make(map[SlotType]string)
@@ -57,6 +71,11 @@ func newMiddlewareContext(ctlName, methodName string, location SlotType, param s
 	return m
 }
 
+// GetParam returns the value associated with key from middleware context's
+// parameters.
+//
+// If the key is present in the map, the value (string) is returned.
+// If the key is not present in the map, an empty string is returned.
 func (m *MiddlewareContext) GetParam(key string) string {
 	if ss, ok := m.ParamValues[key]; ok {
 		return strings.Join(ss, ",")
@@ -112,6 +131,13 @@ type Middleware struct {
 	config *config.Config
 }
 
+// LoadConfig loads the configuration with the specified key and value into the Middleware's config.
+//
+// Parameters:
+// - key: the key used to identify the configuration.
+// - config: the configuration value to be loaded.
+//
+// Return type: None.
 func (m *Middleware) LoadConfig(key string, config any) {
 	_ = m.config.LoadWithKey(key, config)
 }

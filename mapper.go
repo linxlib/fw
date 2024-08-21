@@ -13,5 +13,7 @@ type ServiceMapper interface {
 }
 
 type IController interface {
+	// Init will be called after the controller is created and the service will be passed to the controller
+	// via the provider. The controller should use the provider to get the service instance,
 	Init(provider inject.Provider)
 }
