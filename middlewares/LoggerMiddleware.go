@@ -1,9 +1,10 @@
 package middlewares
 
 import (
+	"github.com/gookit/color"
 	"github.com/linxlib/conv"
 	"github.com/linxlib/fw"
-	"github.com/sirupsen/logrus"
+	"github.com/linxlib/fw/types"
 	"time"
 )
 
@@ -13,15 +14,14 @@ const (
 
 var _ fw.IMiddlewareGlobal = (*LoggerMiddleware)(nil)
 
-func NewLoggerMiddleware(logger *logrus.Logger) fw.IMiddlewareGlobal {
+func NewLoggerMiddleware() fw.IMiddlewareGlobal {
 	return &LoggerMiddleware{
-		MiddlewareGlobal: fw.NewMiddlewareGlobal(loggerName),
-		Logger:           logger}
+		MiddlewareGlobal: fw.NewMiddlewareGlobal(loggerName)}
 }
 
 type LoggerMiddleware struct {
 	*fw.MiddlewareGlobal
-	Logger *logrus.Logger `inject:""`
+	Logger types.ILogger `inject:""`
 }
 
 func (w *LoggerMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
@@ -36,6 +36,8 @@ func (w *LoggerMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
 		//	params.ClientIP = string(fctx.Request.Header.Peek(w.realIPHeader))
 		//}
 		params.ClientIP = fctx.RemoteIP().String()
+		params.Protocol = conv.String(fctx.Request.Header.Protocol())
+		params.UserAgent = conv.String(fctx.Request.Header.UserAgent())
 		params.Method = conv.String(fctx.Method())
 		ctx.Next(context)
 		params.TimeStamp = time.Now()
@@ -45,15 +47,66 @@ func (w *LoggerMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
 		if exist && err != nil {
 			params.ErrorMessage = "\nErr:" + err.(error).Error()
 		}
+		info := make([]types.Arg, 0)
+		k, v := params.TimeStampWithColor("%19s")
+		info = append(info, types.Arg{
+			Key:   k,
+			Value: v,
+		})
+		k, v = params.ClientIPWithColor("%13s")
+		info = append(info, types.Arg{
+			Key:   k,
+			Value: v,
+		})
+		info = append(info, types.Arg{
+			Key:   `-`,
+			Value: color.White,
+		})
+		k, v = params.MethodWithColor(`"%3s`)
+		info = append(info, types.Arg{
+			Key:   k,
+			Value: v,
+		})
 
-		w.Logger.Printf("|%3s| %18s | %20s | %-7s %s %s%s",
-			params.StatusCodeWithColor(),
-			params.LatencyWithColor(),
-			params.ClientIPWithColor(),
-			params.MethodWithColor(),
-			params.Path,
-			byteCountSI(int64(params.BodySize)),
-			params.ErrorMessage,
-		)
+		info = append(info, types.Arg{
+			Key:   params.Path,
+			Value: color.HiWhite,
+		})
+
+		info = append(info, types.Arg{
+			Key:   params.Protocol + `"`,
+			Value: color.HiWhite,
+		})
+		k, v = params.StatusCodeWithColor("%3d")
+		info = append(info, types.Arg{
+			Key:   k,
+			Value: v,
+		})
+
+		k, v = params.LatencyWithColor("%8s")
+		info = append(info, types.Arg{
+			Key:   k,
+			Value: v,
+		})
+		info = append(info, types.Arg{
+			Key:   byteCountSI(int64(params.BodySize)),
+			Value: color.White,
+		})
+		info = append(info, types.Arg{
+			Key:   params.UserAgent,
+			Value: color.Blue,
+		})
+
+		if params.ErrorMessage != "" {
+			info = append(info, types.Arg{
+				Key:   "\n",
+				Value: color.Normal,
+			})
+			info = append(info, types.Arg{
+				Key:   params.ErrorMessage,
+				Value: color.Red,
+			})
+		}
+		w.Logger.Info(info)
 	}
 }

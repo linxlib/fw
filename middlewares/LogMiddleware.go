@@ -5,6 +5,7 @@ import (
 	"github.com/gookit/color"
 	"github.com/linxlib/conv"
 	"github.com/linxlib/fw"
+	"github.com/linxlib/fw/types"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"time"
@@ -29,51 +30,56 @@ type LogParams struct {
 	BodySize int
 	// Keys are the keys set on the request's context.
 	Keys map[string]any
+
+	Protocol  string
+	UserAgent string
 }
 
-func (p *LogParams) TimeStampWithColor() string {
-	return color.HiWhite.Sprint(p.TimeStamp.Format(time.DateTime))
+func (p *LogParams) TimeStampWithColor(f string) (string, color.Color) {
+	return fmt.Sprintf(f, p.TimeStamp.Format(time.DateTime)), color.HiWhite
 }
-func (p *LogParams) LatencyWithColor() string {
-	return color.HiWhite.Sprint(p.Latency.String())
+func (p *LogParams) LatencyWithColor(f string) (string, color.Color) {
+	return fmt.Sprintf(f, p.Latency.String()), color.HiWhite
 }
-func (p *LogParams) ClientIPWithColor() string {
-	return color.HiWhite.Sprint(p.ClientIP)
+func (p *LogParams) ClientIPWithColor(f string) (string, color.Color) {
+	return fmt.Sprintf(f, p.ClientIP), color.HiWhite
 }
-func (p *LogParams) StatusCodeWithColor() string {
-	code := p.StatusCode
+
+func (p *LogParams) StatusCodeWithColor(f string) (string, color.Color) {
+	code := fmt.Sprintf(f, p.StatusCode)
 	switch {
-	case code >= http.StatusContinue && code < http.StatusOK:
-		return color.White.Sprint(code)
-	case code >= http.StatusOK && code < http.StatusMultipleChoices:
-		return color.Green.Sprint(code)
-	case code >= http.StatusMultipleChoices && code < http.StatusBadRequest:
-		return color.White.Sprint(code)
-	case code >= http.StatusBadRequest && code < http.StatusInternalServerError:
-		return color.Yellow.Sprint(code)
+	case p.StatusCode >= http.StatusContinue && p.StatusCode < http.StatusOK:
+		return code, color.White
+	case p.StatusCode >= http.StatusOK && p.StatusCode < http.StatusMultipleChoices:
+		return code, color.HiGreen
+	case p.StatusCode >= http.StatusMultipleChoices && p.StatusCode < http.StatusBadRequest:
+		return code, color.White
+	case p.StatusCode >= http.StatusBadRequest && p.StatusCode < http.StatusInternalServerError:
+		return code, color.Yellow
 	default:
-		return color.Red.Sprint(code)
+		return code, color.Red
 	}
 }
 
-func (p *LogParams) MethodWithColor() string {
+func (p *LogParams) MethodWithColor(f string) (string, color.Color) {
+	m := fmt.Sprintf(f, p.Method)
 	switch p.Method {
 	case "GET":
-		return color.Blue.Sprint(p.Method)
+		return m, color.Blue
 	case "POST":
-		return color.Cyan.Sprint(p.Method)
+		return m, color.Cyan
 	case "PUT":
-		return color.Yellow.Sprint(p.Method)
+		return m, color.Yellow
 	case "DELETE":
-		return color.Red.Sprint(p.Method)
+		return m, color.Red
 	case "PATCH":
-		return color.Green.Sprint(p.Method)
+		return m, color.Green
 	case "HEAD":
-		return color.Magenta.Sprint(p.Method)
+		return m, color.Magenta
 	case "OPTIONS":
-		return color.White.Sprint(p.Method)
+		return m, color.White
 	default:
-		return color.Normal.Sprint(p.Method)
+		return m, color.Normal
 	}
 }
 
@@ -113,7 +119,8 @@ func (w *LogMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
 		if w.realIPHeader != "" {
 			params.ClientIP = string(fctx.Request.Header.Peek(w.realIPHeader))
 		}
-		params.ClientIP = fctx.RemoteIP().String()
+		params.ClientIP = fctx.RemoteAddr().String()
+
 		params.Method = conv.String(fctx.Method())
 		ctx.Next(context)
 		params.TimeStamp = time.Now()
@@ -124,15 +131,52 @@ func (w *LogMiddleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
 			params.ErrorMessage = "\nErr:" + err.(error).Error()
 		}
 
-		w.Logger.Printf("|%3s| %18s | %15s | %-7s %s %s%s",
-			params.StatusCodeWithColor(),
-			params.LatencyWithColor(),
-			params.ClientIPWithColor(),
-			params.MethodWithColor(),
-			params.Path,
-			byteCountSI(int64(params.BodySize)),
-			params.ErrorMessage,
-		)
+		info := make([]types.Arg, 0)
+		k, v := params.TimeStampWithColor("%20s")
+		info = append(info, types.Arg{
+			Key:   k,
+			Value: v,
+		})
+		k, v = params.ClientIPWithColor("%20s")
+		info = append(info, types.Arg{
+			Key:   k,
+			Value: v,
+		})
+		info = append(info, types.Arg{
+			Key:   "-",
+			Value: color.White,
+		})
+		k, v = params.MethodWithColor("%3s")
+		info = append(info, types.Arg{
+			Key:   k,
+			Value: v,
+		})
+		//k, v = params.Path
+
+		info = append(info, types.Arg{
+			Key:   params.Path,
+			Value: color.White,
+		})
+		k, v = params.LatencyWithColor("%7s")
+		info = append(info, types.Arg{
+			Key:   k,
+			Value: v,
+		})
+		info = append(info, types.Arg{
+			Key:   byteCountSI(int64(params.BodySize)),
+			Value: color.White,
+		})
+		if params.ErrorMessage != "" {
+			info = append(info, types.Arg{
+				Key:   "\n",
+				Value: color.Normal,
+			})
+			info = append(info, types.Arg{
+				Key:   params.ErrorMessage,
+				Value: color.Red,
+			})
+		}
+		w.Logger.Info(info)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/linxlib/fw/attribute"
 	"github.com/linxlib/fw/binding"
 	"github.com/linxlib/fw/internal"
+	"github.com/linxlib/fw/types"
 	"github.com/linxlib/inject"
 	"github.com/pterm/pterm"
 	"github.com/sirupsen/logrus"
@@ -124,6 +125,9 @@ type Server struct {
 }
 
 func (s *Server) configLogger() {
+	var l types.ILogger = new(types.Logger)
+	s.Map(l)
+
 	logger := logrus.New()
 	logger.SetOutput(os.Stdout)
 	logger.SetFormatter(Console())
