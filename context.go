@@ -11,6 +11,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"html/template"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -261,11 +262,12 @@ func (c *Context) Redirect(code int, location string) {
 		Location: location,
 	})
 }
-func (c *Context) Data(code int, contentType string, data []byte) {
+func (c *Context) Data(code int, contentType string, data []byte) *Context {
 	c.Render(code, render.Data{
 		ContentType: contentType,
 		Data:        data,
 	})
+	return c
 }
 func (c *Context) DataFromReader(code int, contentLength int64, contentType string, reader io.Reader, extraHeaders map[string]string) {
 	c.Render(code, render.Reader{
@@ -275,8 +277,9 @@ func (c *Context) DataFromReader(code int, contentLength int64, contentType stri
 		Reader:        reader,
 	})
 }
-func (c *Context) File(filepath string) {
+func (c *Context) File(filepath string) *Context {
 	c.ctx.SendFile(filepath)
+	return c
 }
 
 // Protocol returns the HTTP protocol of request: HTTP/1.1 and HTTP/2.
@@ -286,18 +289,24 @@ func (c *Context) Protocol() string {
 func (c *Context) HTML(code int, name string, obj any) {
 
 }
-func (c *Context) HTMLPure(code int, content string, obj any) {
+func (c *Context) HTMLPure(code int, content string, obj any) *Context {
 	tmpl, _ := template.New("html").Parse(content)
 	c.Render(code, render.HTML{
 		Template: tmpl,
 		Name:     "html",
 		Data:     obj,
 	})
+	return c
 }
 
 // Stream sends a streaming response and returns a boolean
 // indicates "Is client disconnected in middle of stream"
 func (c *Context) Stream(step func(w *bufio.Writer)) {
+	c.SetContentType("text/event-stream")
+	c.SetHeader("Cache-Control", "no-cache")
+	c.SetHeader("Connection", "keep-alive")
+	c.SetHeader("Access-Control-Allow-Origin", "*")
+	c.SetHeader("Transfer-Encoding", "chunked")
 	c.ctx.SetBodyStreamWriter(step)
 }
 
@@ -307,13 +316,14 @@ func escapeQuotes(s string) string {
 	return quoteEscaper.Replace(s)
 }
 
-func (c *Context) FileAttachment(filepath, filename string) {
+func (c *Context) FileAttachment(filepath, filename string) *Context {
 	if isASCII(filename) {
 		c.ctx.Response.Header.Set("Content-Disposition", `attachment; filename="`+escapeQuotes(filename)+`"`)
 	} else {
 		c.ctx.Response.Header.Set("Content-Disposition", `attachment; filename*=UTF-8''`+url.QueryEscape(filename))
 	}
 	c.ctx.SendFile(filepath)
+	return c
 }
 
 // Vary adds the given header field to the Vary response header.
@@ -335,8 +345,9 @@ func (c *Context) Writef(f string, a ...any) (int, error) {
 }
 
 // WriteString appends s to response body.
-func (c *Context) WriteString(s string) {
+func (c *Context) WriteString(s string) *Context {
 	c.ctx.Response.SetBodyString(s)
+	return c
 }
 
 // SendStatus sets the HTTP status code and if the response body is empty,
@@ -411,12 +422,13 @@ func (c *Context) IsFromLocal() bool {
 }
 
 // Type sets the Content-Type HTTP header to the MIME type specified by the file extension.
-func (c *Context) Type(extension string, charset ...string) {
+func (c *Context) Type(extension string, charset ...string) *Context {
 	if len(charset) > 0 {
 		c.ctx.Response.Header.SetContentType(GetMIME(extension) + "; charset=" + charset[0])
 	} else {
 		c.ctx.Response.Header.SetContentType(GetMIME(extension))
 	}
+	return c
 }
 func (c *Context) Method() string {
 	return conv.String(c.ctx.Method())
@@ -426,8 +438,9 @@ func (c *Context) setCanonical(key, val string) {
 }
 
 // Location sets the response Location HTTP header to the specified path parameter.
-func (c *Context) Location(path string) {
+func (c *Context) Location(path string) *Context {
 	c.setCanonical("Location", path)
+	return c
 }
 
 // ContextString returns unique string representation of the ctx.
@@ -470,8 +483,10 @@ func (c *Context) ContextString() string {
 }
 
 // SetHeader sets the response's HTTP header field to the specified key, value.
-func (c *Context) SetHeader(key, val string) {
+func (c *Context) SetHeader(key, val string) *Context {
 	c.ctx.Response.Header.Set(key, val)
+
+	return c
 }
 
 // SendStream sets response body stream and optional body size.
@@ -503,4 +518,54 @@ func (c *Context) SaveUploadFile(file *multipart.FileHeader, dst string) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Context) PostBody() []byte {
+	return c.ctx.PostBody()
+}
+
+func (c *Context) QueryArgs() *fasthttp.Args {
+	return c.ctx.QueryArgs()
+}
+func (c *Context) VisitQueryArgs(callback func(key string, value string)) {
+	c.ctx.QueryArgs().VisitAll(func(key, value []byte) {
+		callback(conv.String(key), conv.String(value))
+	})
+}
+func (c *Context) PostArgs() *fasthttp.Args {
+	return c.ctx.PostArgs()
+}
+func (c *Context) VisitPostArgs(callback func(key string, value string)) {
+	c.ctx.PostArgs().VisitAll(func(key, value []byte) {
+		callback(conv.String(key), conv.String(value))
+	})
+}
+
+func (c *Context) MultipartForm() (*multipart.Form, error) {
+	return c.ctx.MultipartForm()
+}
+
+func (c *Context) ServeFS(fs fs.FS, path string) *Context {
+	fasthttp.ServeFS(c.ctx, fs, path)
+	return c
+}
+func (c *Context) SetContentType(value string) *Context {
+	c.ctx.SetContentType(value)
+	return c
+}
+func (c *Context) RequestURI() string {
+	return conv.String(c.ctx.RequestURI())
+}
+func (c *Context) UserAgent() string {
+	return conv.String(c.ctx.UserAgent())
+}
+func (c *Context) Host() string {
+	return conv.String(c.ctx.Host())
+}
+func (c *Context) ResetBody() *Context {
+	c.ctx.Response.ResetBody()
+	return c
+}
+func (c *Context) ResponseBody() []byte {
+	return c.ctx.Response.Body()
 }
