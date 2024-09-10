@@ -463,13 +463,40 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 func (s *Server) wrapM(handler *astp.Element) HandlerFunc {
 	return func(context *Context) {
 		var err error
+		// binding params
 		err = s.bind(context, handler)
 		if err != nil {
 			panic(err)
 		}
-		_, err = context.Invoke(handler.GetValue())
+		// call method
+		values, err := context.Invoke(handler.GetValue())
 		if err != nil {
 			panic(err)
+		}
+		last := len(values) - 1
+		if last == -1 { // if there is no return value, just skip.
+			if !context.hasReturn {
+				context.SendStatus(200)
+			}
+			return
+		}
+
+		if err := values[last]; !err.IsZero() {
+			// if the last return value is error, parse it and write error info into response body
+			if e, ok := err.Interface().(error); ok {
+				context.Error(e)
+			} else { // If there is no error return value, the return value will be treated as a normal return.
+				// and only one return value will be written into response body
+				if !context.hasReturn {
+					context.PureJSON(200, values[0].Interface())
+				}
+			}
+		} else {
+			// method returns error, just ignore others.
+			if !context.hasReturn {
+				context.PureJSON(200, values[0].Interface())
+			}
+			//context.Error(err.Interface().(error))
 		}
 	}
 }

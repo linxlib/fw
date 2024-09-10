@@ -2,8 +2,8 @@ package fw
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
+	"github.com/gookit/goutil/errorx"
 	"github.com/linxlib/conv"
 	"github.com/linxlib/fw/render"
 	"github.com/linxlib/inject"
@@ -30,8 +30,9 @@ type Context struct {
 	mu   sync.RWMutex
 	Keys map[string]any
 
-	Errors     errorMsgs
+	errs       errorx.Errors
 	ErrHandler func(*Context, error)
+	hasReturn  bool // 是否已经通过上下文方法写入了返回值(包括并且不限于状态码, body, header等)
 }
 
 func newContext(ctx *fasthttp.RequestCtx, parent ...inject.Injector) *Context {
@@ -48,6 +49,7 @@ func newContext(ctx *fasthttp.RequestCtx, parent ...inject.Injector) *Context {
 	}
 	return cc
 }
+
 func (c *Context) Map(i ...interface{}) inject.TypeMapper {
 	return c.inj.Map(i...)
 }
@@ -65,6 +67,7 @@ func (c *Context) RemoteIP() string {
 	return c.ctx.RemoteIP().String()
 }
 
+// TODO: 这个方法应该被取消或私有, 为了配合hasReturn
 func (c *Context) GetFastContext() *fasthttp.RequestCtx {
 	return c.ctx
 }
@@ -72,6 +75,7 @@ func (c *Context) GetFastContext() *fasthttp.RequestCtx {
 func (c *Context) Injector() inject.Injector {
 	return c.inj
 }
+
 func (c *Context) Invoke(i interface{}) ([]reflect.Value, error) {
 	return c.inj.Invoke(i)
 }
@@ -183,6 +187,7 @@ func (c *Context) Param(key string) string {
 // TODO: 完善Context所提供的方法
 
 func (c *Context) Status(code int) {
+	c.hasReturn = true
 	c.ctx.SetStatusCode(code)
 }
 func bodyAllowedForStatus(status int) bool {
@@ -196,7 +201,7 @@ func bodyAllowedForStatus(status int) bool {
 	}
 	return true
 }
-func (c *Context) Render(code int, r render.IRender) {
+func (c *Context) render(code int, r render.IRender) {
 	c.Status(code)
 
 	if !bodyAllowedForStatus(code) {
@@ -206,30 +211,21 @@ func (c *Context) Render(code int, r render.IRender) {
 
 	if err := r.Render(c.ctx); err != nil {
 		// Pushing error to c.Errors
-		_ = c.Error(err)
+		c.Error(err)
 		//c.Abort()
 	}
 }
-func (c *Context) Error(err error) *Error {
+
+func (c *Context) Error(err error) {
 	if err == nil {
 		panic("err is nil")
 	}
 
-	var parsedError *Error
-	ok := errors.As(err, &parsedError)
-	if !ok {
-		parsedError = &Error{
-			Err:  err,
-			Type: ErrorTypePrivate,
-		}
-	}
-
-	c.Errors = append(c.Errors, parsedError)
-	return parsedError
+	c.String(500, err.Error())
 }
 
 func (c *Context) JSON(code int, obj any) {
-	c.Render(code, render.JSON{Data: obj})
+	c.render(code, render.JSON{Data: obj})
 }
 func (c *Context) JSONP(data any, callback ...string) {
 	var cb string
@@ -239,38 +235,38 @@ func (c *Context) JSONP(data any, callback ...string) {
 	} else {
 		cb = "callback"
 	}
-	c.Render(200, render.JsonpJSON{
+	c.render(200, render.JsonpJSON{
 		Callback: cb,
 		Data:     data,
 	})
 }
 func (c *Context) AsciiJSON(code int, obj any) {
-	c.Render(code, render.AsciiJSON{Data: obj})
+	c.render(code, render.AsciiJSON{Data: obj})
 }
 func (c *Context) PureJSON(code int, obj any) {
-	c.Render(code, render.PureJSON{Data: obj})
+	c.render(code, render.PureJSON{Data: obj})
 }
 func (c *Context) XML(code int, obj any) {
-	c.Render(code, render.XML{Data: obj})
+	c.render(code, render.XML{Data: obj})
 }
 func (c *Context) String(code int, format string, values ...any) {
-	c.Render(code, render.String{Format: format, Data: values})
+	c.render(code, render.String{Format: format, Data: values})
 }
 func (c *Context) Redirect(code int, location string) {
-	c.Render(-1, render.Redirect{
+	c.render(-1, render.Redirect{
 		Code:     code,
 		Location: location,
 	})
 }
 func (c *Context) Data(code int, contentType string, data []byte) *Context {
-	c.Render(code, render.Data{
+	c.render(code, render.Data{
 		ContentType: contentType,
 		Data:        data,
 	})
 	return c
 }
 func (c *Context) DataFromReader(code int, contentLength int64, contentType string, reader io.Reader, extraHeaders map[string]string) {
-	c.Render(code, render.Reader{
+	c.render(code, render.Reader{
 		Headers:       extraHeaders,
 		ContentType:   contentType,
 		ContentLength: contentLength,
@@ -278,6 +274,7 @@ func (c *Context) DataFromReader(code int, contentLength int64, contentType stri
 	})
 }
 func (c *Context) File(filepath string) *Context {
+	c.hasReturn = true
 	c.ctx.SendFile(filepath)
 	return c
 }
@@ -287,11 +284,10 @@ func (c *Context) Protocol() string {
 	return conv.String(c.ctx.Request.Header.Protocol())
 }
 func (c *Context) HTML(code int, name string, obj any) {
-
 }
 func (c *Context) HTMLPure(code int, content string, obj any) *Context {
 	tmpl, _ := template.New("html").Parse(content)
-	c.Render(code, render.HTML{
+	c.render(code, render.HTML{
 		Template: tmpl,
 		Name:     "html",
 		Data:     obj,
@@ -302,6 +298,7 @@ func (c *Context) HTMLPure(code int, content string, obj any) *Context {
 // Stream sends a streaming response and returns a boolean
 // indicates "Is client disconnected in middle of stream"
 func (c *Context) Stream(step func(w *bufio.Writer)) {
+	c.hasReturn = true
 	c.SetContentType("text/event-stream")
 	c.SetHeader("Cache-Control", "no-cache")
 	c.SetHeader("Connection", "keep-alive")
@@ -317,6 +314,7 @@ func escapeQuotes(s string) string {
 }
 
 func (c *Context) FileAttachment(filepath, filename string) *Context {
+	c.hasReturn = true
 	if isASCII(filename) {
 		c.ctx.Response.Header.Set("Content-Disposition", `attachment; filename="`+escapeQuotes(filename)+`"`)
 	} else {
@@ -346,7 +344,7 @@ func (c *Context) Writef(f string, a ...any) (int, error) {
 
 // WriteString appends s to response body.
 func (c *Context) WriteString(s string) *Context {
-	c.ctx.Response.SetBodyString(s)
+	c.ctx.Response.AppendBodyString(s)
 	return c
 }
 
@@ -491,6 +489,7 @@ func (c *Context) SetHeader(key, val string) *Context {
 
 // SendStream sets response body stream and optional body size.
 func (c *Context) SendStream(stream io.Reader, size ...int) error {
+	c.hasReturn = true
 	if len(size) > 0 && size[0] >= 0 {
 		c.ctx.Response.SetBodyStream(stream, size[0])
 	} else {
