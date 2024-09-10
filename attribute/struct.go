@@ -47,7 +47,7 @@ func GetStructAttrByName(s *astp.Element, attrName string) *Attribute {
 	attrName = strings.ToUpper(attrName)
 	if cmdCache, ok := cmdStructCaches[s]; ok {
 		for _, cmd := range cmdCache {
-			if cmd.Name == attrName {
+			if strings.EqualFold(cmd.Name, attrName) {
 				return cmd
 			}
 		}
