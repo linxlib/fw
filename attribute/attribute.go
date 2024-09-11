@@ -63,7 +63,9 @@ func RegAttributeType(name string, value AttributeType) {
 // ParseDoc 解析注解
 func ParseDoc(doc []string, name string) []*Attribute {
 	if len(doc) == 0 {
-		return []*Attribute{}
+		return []*Attribute{
+			{Name: name, Value: name, Type: TypeDoc},
+		}
 	}
 	docs := make([]*Attribute, len(doc))
 	if doc == nil {

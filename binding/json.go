@@ -2,7 +2,6 @@ package binding
 
 import (
 	"bytes"
-	"errors"
 	"github.com/linxlib/fw/internal/json"
 	"github.com/valyala/fasthttp"
 	"io"
@@ -27,7 +26,7 @@ func (jsonBinding) Name() string {
 
 func (jsonBinding) Bind(req *fasthttp.RequestCtx, obj any) error {
 	if req == nil || req.PostBody() == nil {
-		return errors.New("invalid request")
+		return nil
 	}
 
 	return decodeJSON(bytes.NewReader(req.PostBody()), obj)

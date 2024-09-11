@@ -439,6 +439,11 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 
 		//TODO: 根据请求方法和contentType进行binding
 		cmd := attribute.GetLastAttr(param)
+		if (c.Method() == "GET" || c.Method() == "HEAD") && (strings.ToLower(cmd.Name) == "body" || strings.ToLower(cmd.Name) == "json") {
+			//类似不合规的参数, 进行跳过
+			continue
+		}
+
 		if cmd.Type == attribute.TypeInner {
 			continue
 		}
@@ -449,7 +454,24 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 		} else {
 
 			// 对方法参数进行数据映射和校验
-			if err := binding.GetByAttr(cmd).Bind(c.GetFastContext(), paramV.Interface()); err != nil {
+			binder := binding.GetByAttr(cmd)
+			if c.Method() == "POST" || c.Method() == "PUT" || c.Method() == "PUT" || c.Method() == "PATCH" || c.Method() == "DELETE" {
+				switch c.GetHeader("Content-Type") {
+				case "application/json":
+					binder = binding.JSON
+				case "application/xml":
+					binder = binding.XML
+				case "application/x-www-form-urlencoded":
+					binder = binding.Form
+				case "multipart/form-data":
+					binder = binding.FormMultipart
+				case "text/plain":
+					binder = binding.Plain
+
+				}
+			}
+
+			if err := binder.Bind(c.GetFastContext(), paramV.Interface()); err != nil {
 				return err
 			}
 		}
