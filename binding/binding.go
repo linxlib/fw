@@ -143,6 +143,9 @@ func Get(cmd string) Binding {
 func GetByAttr(attr *attribute.Attribute) Binding {
 	return Get(strings.ToLower(attr.Name))
 }
+func IsBodyBinder(bind Binding) bool {
+	return bind == JSON || bind == XML || bind == Form || bind == FormMultipart || bind == Plain
+}
 
 func validate(obj any) error {
 	v := valid.New(obj)

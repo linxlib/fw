@@ -455,19 +455,21 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 
 			// 对方法参数进行数据映射和校验
 			binder := binding.GetByAttr(cmd)
-			if c.Method() == "POST" || c.Method() == "PUT" || c.Method() == "PUT" || c.Method() == "PATCH" || c.Method() == "DELETE" {
-				switch c.GetHeader("Content-Type") {
-				case "application/json":
-					binder = binding.JSON
-				case "application/xml":
-					binder = binding.XML
-				case "application/x-www-form-urlencoded":
-					binder = binding.Form
-				case "multipart/form-data":
-					binder = binding.FormMultipart
-				case "text/plain":
-					binder = binding.Plain
+			if binding.IsBodyBinder(binder) {
+				if c.Method() == "POST" || c.Method() == "PUT" || c.Method() == "PUT" || c.Method() == "PATCH" || c.Method() == "DELETE" {
+					switch c.GetHeader("Content-Type") {
+					case "application/json":
+						binder = binding.JSON
+					case "application/xml":
+						binder = binding.XML
+					case "application/x-www-form-urlencoded":
+						binder = binding.Form
+					case "multipart/form-data":
+						binder = binding.FormMultipart
+					case "text/plain":
+						binder = binding.Plain
 
+					}
 				}
 			}
 
