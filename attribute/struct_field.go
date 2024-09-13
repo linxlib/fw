@@ -36,5 +36,13 @@ func GetFieldAttributeAsParamType(f *astp.Element) []*Attribute {
 // GetLastAttr 返回参数类型上注解的最后一个
 func GetLastAttr(f *astp.Element) *Attribute {
 	as := GetFieldAttributeAsParamType(f)
+	if len(as) <= 0 {
+		return &Attribute{
+			Name:  "",
+			Value: "",
+			Type:  TypeInner,
+			Index: 0,
+		}
+	}
 	return as[len(as)-1]
 }
