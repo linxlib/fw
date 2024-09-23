@@ -7,9 +7,10 @@ require (
 	github.com/fasthttp/websocket v1.5.10
 	github.com/google/uuid v1.6.0
 	github.com/gookit/color v1.5.4
+	github.com/gookit/goutil v0.6.16
 	github.com/gookit/validate v1.5.2
-	github.com/linxlib/astp v0.0.0-00010101000000-000000000000
-	github.com/linxlib/config v0.2.4
+	github.com/linxlib/astp v0.2.11
+	github.com/linxlib/config v0.2.5
 	github.com/linxlib/conv v1.1.1
 	github.com/linxlib/inject v0.1.3
 	github.com/pterm/pterm v0.12.79
@@ -28,7 +29,6 @@ require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/gookit/filter v1.2.1 // indirect
-	github.com/gookit/goutil v0.6.16 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
@@ -40,7 +40,3 @@ require (
 	golang.org/x/term v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 )
-
-replace github.com/linxlib/astp => ../../linxlib/astp
-
-replace github.com/linxlib/config => ../../linxlib/config

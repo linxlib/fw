@@ -51,6 +51,10 @@ github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORN
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
+github.com/linxlib/astp v0.2.11 h1:UUR05FExLOvGRiaJ1ghj3pWfOoo6wNr/vpMP5750r3Y=
+github.com/linxlib/astp v0.2.11/go.mod h1:aDFP1SWOGhQ0vqaxVj8KWotqJmGsgrHCjYRBatK177Y=
+github.com/linxlib/config v0.2.5 h1:wibM57bfeMVQAMoUTZeYPz+u3EphHmLcWZp2Us451n8=
+github.com/linxlib/config v0.2.5/go.mod h1:j2g6p4KfdYOA1WsDMzIKmR5L/usNlYa7UfwHRm24IlQ=
 github.com/linxlib/conv v1.1.1 h1:Uud3CeiQ4KHGoeA9fqKAGYCvlsKmGDLItm9J88Xv4yk=
 github.com/linxlib/conv v1.1.1/go.mod h1:vsub+J4KRkL/Jy/5gGXSgsLEDAj8itaYIAVH+8Rvf40=
 github.com/linxlib/inject v0.1.3 h1:bBVUD5hYuZO/82H7B2yRqKXLYguARXWfC9pHlKwSrag=
