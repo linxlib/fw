@@ -7,10 +7,10 @@ require (
 	github.com/fasthttp/websocket v1.5.10
 	github.com/google/uuid v1.6.0
 	github.com/gookit/color v1.5.4
-	github.com/gookit/goutil v0.6.16
+	github.com/gookit/goutil v0.6.17
 	github.com/gookit/validate v1.5.2
 	github.com/linxlib/astp v0.2.11
-	github.com/linxlib/config v0.2.5
+	github.com/linxlib/config v0.2.6
 	github.com/linxlib/conv v1.1.1
 	github.com/linxlib/inject v0.1.3
 	github.com/pterm/pterm v0.12.79
@@ -36,7 +36,8 @@ require (
 	github.com/savsgio/gotils v0.0.0-20240704082632-aef3928b8a38 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/sys v0.22.0 // indirect
-	golang.org/x/term v0.22.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/sync v0.8.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/term v0.24.0 // indirect
+	golang.org/x/text v0.18.0 // indirect
 )

@@ -59,7 +59,7 @@ type LoggerOption struct {
 	LocalTime         bool   `yaml:"localTime" default:"true"`
 }
 
-func New() *Server {
+func New(key ...string) *Server {
 	s := &Server{
 		Injector:           inject.New(),
 		router:             router.New(),
@@ -68,24 +68,28 @@ func New() *Server {
 		parser:             astp.NewParser(),
 		middleware:         NewMiddlewareContainer(),
 		routerTreeForPrint: make(map[string][][2]string),
-		start:              time.Now(),
+		beginTime:          time.Now(),
 	}
 	s.conf = config.New(&config.Option{
 		AutoReload:         true,
 		Silent:             true,
 		ENVPrefix:          "FW",
 		Files:              []string{"config/config.yaml"},
-		AutoReloadInterval: time.Second * 5,
+		AutoReloadInterval: time.Second * 1,
 		AutoReloadCallback: func(key string, config interface{}) {
 			fmt.Println("key=", key, "config=", config)
 		},
 	})
 	s.option.IntranetIP = getIntranetIP()
-	err := s.conf.Load(s.option)
+	configKey := ""
+	if len(key) > 0 {
+		configKey = key[0]
+	}
+	err := s.conf.LoadWithKey(configKey, s.option)
 	if err != nil {
 		panic(err)
 	}
-	pterm.DefaultHeader.WithBackgroundStyle(pterm.NewStyle(pterm.BgBlack)).WithFullWidth().Println("FW for golang developers")
+	//pterm.DefaultHeader.WithBackgroundStyle(pterm.NewStyle(pterm.BgBlack)).WithFullWidth().Println("FW for golang developers")
 
 	s.configLogger()
 
@@ -121,7 +125,7 @@ type Server struct {
 	//TODO: multiple hooks
 	hookHandler        HookHandler
 	routerTreeForPrint map[string][][2]string
-	start              time.Time
+	beginTime          time.Time
 }
 
 func (s *Server) configLogger() {
@@ -234,6 +238,9 @@ func (s *Server) RegisterRoute(controller any) {
 
 	if v, ok := controller.(IController); ok {
 		v.Init(s)
+	}
+	if v, ok := controller.(IControllerConfig); ok {
+		v.InitConfig(s.conf)
 	}
 	//defer func() {
 	//	if err := recover(); err != nil {
@@ -619,7 +626,7 @@ func (s *Server) printInfo() {
 	style.Print("FW ")
 	style1.Print(Version + " ")
 	style2.Print("ready in ")
-	style3.Println(time.Now().Sub(s.start).String())
+	style3.Println(time.Now().Sub(s.beginTime).String())
 
 	//color.Printf("%s %s %s\n", color.HiGreen.Sprintf("FW %s", Version), color.Gray.Sprint("ready in"), color.HiWhite.Sprint("568ms"))
 	style.Print("  ➜ ")
@@ -640,7 +647,10 @@ func (s *Server) printInfo() {
 	}
 }
 
-func (s *Server) Start() {
+func (s *Server) Run() chan bool {
+	return s.start()
+}
+func (s *Server) start() chan bool {
 	if s.hookHandler != nil {
 		for _, file := range s.parser.Files {
 			if !file.IsMain() {
@@ -667,6 +677,10 @@ func (s *Server) Start() {
 	}()
 
 	s.printInfo()
+	return done
+}
+func (s *Server) Start() {
+	done := s.start()
 	for {
 		select {
 		case <-done:

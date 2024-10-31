@@ -20,3 +20,7 @@ type IController interface {
 	// via the provider. The controller should use the provider to get the service instance,
 	Init(provider inject.Provider)
 }
+
+type IControllerConfig interface {
+	InitConfig(config ConfigMapper)
+}
