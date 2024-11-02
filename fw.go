@@ -632,9 +632,12 @@ func (s *Server) printInfo() {
 	style.Print("  ➜ ")
 	style3.Printf("%10s", "Local: ")
 	style4.Printf("http://%s:%d%s\n", "localhost", s.option.Port, s.option.BasePath)
-	style.Print("  ➜ ")
-	style3.Printf("%10s", "Network: ")
-	style4.Printf("http://%s:%d%s\n", s.option.IntranetIP, s.option.Port, s.option.BasePath)
+	if s.CanAccessByLan() {
+		style.Print("  ➜ ")
+		style3.Printf("%10s", "Network: ")
+		style4.Printf("http://%s:%d%s\n", s.option.IntranetIP, s.option.Port, s.option.BasePath)
+	}
+
 	if s.hookHandler != nil {
 		s.hookHandler.Print(AfterListen)
 	}
@@ -645,6 +648,12 @@ func (s *Server) printInfo() {
 			internal.Note("press CTRL+C to exit...")
 		}
 	}
+}
+func (s *Server) CanAccessByLan() bool {
+	if strings.EqualFold(s.option.IntranetIP, s.option.Listen) || strings.EqualFold(s.option.Listen, "0.0.0.0") {
+		return true
+	}
+	return false
 }
 
 func (s *Server) Run() chan bool {
