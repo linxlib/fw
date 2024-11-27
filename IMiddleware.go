@@ -3,6 +3,7 @@ package fw
 import (
 	"github.com/linxlib/config"
 	"github.com/linxlib/fw/attribute"
+	"github.com/linxlib/inject"
 	"net/url"
 	"reflect"
 	"strings"
@@ -97,6 +98,7 @@ type IInitOnce interface {
 }
 type IConfig interface {
 	setConfig(conf *config.Config)
+	setProvider(provider inject.Provider)
 	LoadConfig(key string, config any)
 }
 type IReg interface {
@@ -111,6 +113,7 @@ type IMiddleware interface {
 	IConfig
 	IInitOnce
 	IReg
+	inject.Provider
 }
 
 var _ IMiddleware = (*Middleware)(nil)
@@ -124,11 +127,16 @@ func NewMiddleware(name string, slot string, attr string) *Middleware {
 }
 
 type Middleware struct {
-	slot   string
-	name   string
-	attr   string
-	param  string
-	config *config.Config
+	slot     string
+	name     string
+	attr     string
+	param    string
+	config   *config.Config
+	provider inject.Provider
+}
+
+func (m *Middleware) Provide(i interface{}) error {
+	return m.provider.Provide(i)
 }
 
 // LoadConfig loads the configuration with the specified key and value into the Middleware's config.
@@ -144,6 +152,9 @@ func (m *Middleware) LoadConfig(key string, config any) {
 
 func (m *Middleware) setConfig(conf *config.Config) {
 	m.config = conf
+}
+func (m *Middleware) setProvider(provider inject.Provider) {
+	m.provider = provider
 }
 
 func (m *Middleware) DoInitOnce() {

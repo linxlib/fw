@@ -568,3 +568,31 @@ func (c *Context) ResetBody() *Context {
 func (c *Context) ResponseBody() []byte {
 	return c.ctx.Response.Body()
 }
+
+func (c *Context) Exit() {
+	panic("fw")
+}
+
+func (c *Context) SuccessExit() {
+	c.SendStatus(200)
+	c.Exit()
+}
+
+func (c *Context) DataExit(data any) {
+	c.JSON(200, data)
+	c.Exit()
+}
+
+func (c *Context) ErrorExit(err error) {
+	c.JSON(500, err)
+	c.Exit()
+}
+
+func (c *Context) ErrorExitWithCode(code int, err error) {
+	c.JSON(code, err)
+	c.Exit()
+}
+func (c *Context) ParamErrorExit(key string, msg string) {
+	c.JSON(400, key+":"+msg)
+	c.Exit()
+}

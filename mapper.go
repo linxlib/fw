@@ -24,3 +24,13 @@ type IController interface {
 type IControllerConfig interface {
 	InitConfig(config ConfigMapper)
 }
+
+type IService interface {
+
+	// Init will be called after the service is created and the provider and config will be passed to the service
+	// via the provider. The service should use the provider to get the service instance,
+	Init(provider inject.Provider)
+}
+type IServiceConfig interface {
+	InitConfig(config ConfigMapper)
+}

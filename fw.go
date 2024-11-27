@@ -704,17 +704,52 @@ const (
 
 // Use register middleware to server.
 // you can only use the @'Attribute' after register a middleware
-func (s *Server) Use(middleware IMiddleware) {
-	middleware.setConfig(s.conf)
-	_ = s.Apply(middleware)
-	middleware.DoInitOnce()
-	s.middleware.Reg(middleware)
+func (s *Server) Use(middleware ...IMiddleware) {
+	if len(middleware) <= 0 {
+		return
+	}
+	for _, iMiddleware := range middleware {
+		iMiddleware.setConfig(s.conf)
+		iMiddleware.setProvider(s)
+		_ = s.Apply(iMiddleware)
+		iMiddleware.DoInitOnce()
+		s.middleware.Reg(iMiddleware)
+	}
+
 }
 
-func (s *Server) UseMapper(mapper ServiceMapper) {
-	result, err := mapper.Init(s.conf)
-	if err != nil {
-		panic(err)
+func (s *Server) UseMapper(mapper ...ServiceMapper) {
+	if len(mapper) <= 0 {
+		return
 	}
-	s.Map(result)
+	for _, serviceMapper := range mapper {
+		result, err := serviceMapper.Init(s.conf)
+		if err != nil {
+			panic(err)
+		}
+		s.Map(result)
+	}
+
+}
+
+func (s *Server) UseService(service ...IService) {
+	if len(service) <= 0 {
+		return
+	}
+	for _, iService := range service {
+		iService.Init(s)
+		s.Map(iService)
+	}
+
+}
+
+func (s *Server) UseServiceWithConfig(service ...IServiceConfig) {
+	if len(service) <= 0 {
+		return
+	}
+	for _, serviceConfig := range service {
+		serviceConfig.InitConfig(s.conf)
+		s.Map(serviceConfig)
+	}
+
 }
