@@ -285,7 +285,7 @@ func (s *Server) RegisterRoute(controller any) {
 
 	// 遍历代码中所有的 @Controller 标记的结构，按照控制器对待
 	s.parser.VisitStruct(func(element *astp.Element) bool {
-		return element.Name == typ.Name() && attribute.HasAttribute(element, controllerAttr)
+		return element.Name == typ.Name() && (attribute.HasAttribute(element, controllerAttr) || strings.HasSuffix(element.Name, controllerAttr))
 	}, func(ctl *astp.Element) {
 
 		// 第一层路由 【配置文件】
@@ -526,7 +526,7 @@ func (s *Server) wrapM(handler *astp.Element) HandlerFunc {
 		if err := values[last]; !err.IsZero() {
 			// if the last return value is error, parse it and write error info into response body
 			if e, ok := err.Interface().(error); ok {
-				context.Error(e)
+				context.ErrorExit(e)
 			} else { // If there is no error return value, the return value will be treated as a normal return.
 				// and only one return value will be written into response body
 				if !context.hasReturn {
@@ -536,7 +536,12 @@ func (s *Server) wrapM(handler *astp.Element) HandlerFunc {
 		} else {
 			// method returns error, just ignore others.
 			if !context.hasReturn {
-				context.PureJSON(200, values[0].Interface())
+				if values[0].IsNil() {
+					context.Status(200)
+				} else {
+					context.PureJSON(200, values[0].Interface())
+				}
+
 			}
 			//context.Error(err.Interface().(error))
 		}
