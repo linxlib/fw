@@ -1,0 +1,20 @@
+package mappers
+
+import (
+	"github.com/linxlib/fw"
+)
+
+type {{.Name}}Mapper struct {
+	//list your configs here
+	// ...
+	//list your instance here
+	// ...
+}
+
+func (m *{{.Name}}Mapper) Init(config fw.ConfigMapper) (any, error) {
+	err := config.LoadWithKey("{{.ConfigKey}}",m)
+	if err != nil {
+	    return nil, err
+    }
+}
+

@@ -272,12 +272,12 @@ func (s *Server) RegisterRoute(controller any) {
 		})
 		for _, item := range routeItems {
 			if item.Path != "" && item.Method != "" {
-				err := s.registerRoute(item.Method, joinRoute(s.option.BasePath, item.Path), item.H)
+				err := s.registerRoute(item.Method, joinRoute(s.option.BasePath, item.Path, item.OverrideBasePath), item.H)
 				if err != nil {
 					panic(err)
 				}
 				if !item.IsHide {
-					s.addRouteTable("Global", item.Method, joinRoute(s.option.BasePath, item.Path), item.Middleware.Name()+".H", "@"+item.Middleware.Name())
+					s.addRouteTable("Global", item.Method, joinRoute(s.option.BasePath, item.Path, item.OverrideBasePath), item.Middleware.Name()+".H", "@"+item.Middleware.Name())
 				}
 			}
 		}
@@ -320,12 +320,12 @@ func (s *Server) RegisterRoute(controller any) {
 
 		for _, item := range routeItems {
 			if item.Path != "" && item.Method != "" {
-				err := s.registerRoute(item.Method, joinRoute(base, item.Path), item.H)
+				err := s.registerRoute(item.Method, joinRoute(base, item.Path, item.OverrideBasePath), item.H)
 				if err != nil {
 					continue
 				}
 				if !item.IsHide {
-					s.addRouteTable(ctl.Name, item.Method, joinRoute(base, item.Path), ctl.Name, "@"+item.Middleware.Attribute())
+					s.addRouteTable(ctl.Name, item.Method, joinRoute(base, item.Path, item.OverrideBasePath), ctl.Name, "@"+item.Middleware.Attribute())
 				}
 			}
 		}
@@ -493,6 +493,17 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 
 func (s *Server) wrapM(handler *astp.Element) HandlerFunc {
 	return func(context *Context) {
+		defer func() {
+			if err := recover(); err != nil {
+				if err == "fw" {
+
+				} else if e, ok := err.(error); ok {
+					context.Error(e)
+				} else {
+					s.logger.Error(err)
+				}
+			}
+		}()
 		var err error
 		// binding params
 		err = s.bind(context, handler)

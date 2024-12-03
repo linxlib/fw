@@ -53,7 +53,11 @@ func isASCII(s string) bool {
 	return true
 }
 
-func joinRoute(base string, r string) string {
+func joinRoute(base string, r string, override ...bool) string {
+
+	if len(override) > 0 && override[0] {
+		return r
+	}
 	var result = base
 	if result == "" {
 		result += "/"

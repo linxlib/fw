@@ -1,0 +1,39 @@
+package middlewares
+
+import (
+    "github.com/linxlib/fw"
+)
+
+type {{.Name}}MiddlewareConfig struct {
+    //list your configs here
+
+    // i any  // some service should be injected
+}
+
+var _ fw.IMiddlewareCtl = (*{{.Name}}Middleware)(nil)
+
+func New{{.Name}}Middleware() fw.IMiddlewareCtl {
+    s := &{{.Name}}Middleware{
+        MiddlewareCtl: fw.NewMiddlewareCtl("{{.Name}}", "{{.Name}}"),
+    }
+    return s
+}
+
+type {{.Name}}Middleware struct {
+    *fw.MiddlewareCtl
+    options *{{.Name}}MiddlewareConfig
+}
+
+func (s *{{.Name}}Middleware) DoInitOnce() {
+    s.LoadConfig("{{.ConfigKey}}", s.options)
+    // s.Provide(s.i)
+}
+
+func (s *{{.Name}}Middleware) Execute(ctx *fw.MiddlewareContext) fw.HandlerFunc {
+
+    return func(c *fw.Context) {
+
+
+        ctx.Next(c)
+    }
+}

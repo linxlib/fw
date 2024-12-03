@@ -584,12 +584,12 @@ func (c *Context) DataExit(data any) {
 }
 
 func (c *Context) ErrorExit(err error) {
-	c.JSON(500, err)
+	c.JSON(500, H{"error": err.Error()})
 	c.Exit()
 }
 
 func (c *Context) ErrorExitWithCode(code int, err error) {
-	c.JSON(code, err)
+	c.JSON(code, H{"error": err.Error()})
 	c.Exit()
 }
 func (c *Context) ParamErrorExit(key string, msg string) {

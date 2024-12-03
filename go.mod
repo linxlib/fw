@@ -8,7 +8,7 @@ require (
 	github.com/gookit/color v1.5.4
 	github.com/gookit/goutil v0.6.17
 	github.com/gookit/validate v1.5.2
-	github.com/linxlib/astp v0.2.12
+	github.com/linxlib/astp v0.2.13
 	github.com/linxlib/config v0.2.6
 	github.com/linxlib/conv v1.1.1
 	github.com/linxlib/inject v0.1.3

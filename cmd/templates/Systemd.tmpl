@@ -1,0 +1,14 @@
+[Unit]
+Description={{.Desc}}
+
+[Service]
+Type=simple
+User={{.User}}
+ExecStart={{.Exec}}
+WorkingDirectory={{.WorkDir}}
+Restart=on-failure
+StartLimitInterval=3
+StartLimitBurst=100
+
+[Install]
+WatedBy=multi-user.target

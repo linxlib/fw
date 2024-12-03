@@ -198,11 +198,12 @@ type IMiddlewareCtl interface {
 }
 
 type RouteItem struct {
-	Method     string         // HTTP METHOD
-	Path       string         // route path
-	IsHide     bool           // if set true, this route will not show in route table
-	H          HandlerFunc    // handler for this route
-	Middleware IMiddlewareCtl // just refer to middleware itself
+	Method           string         // HTTP METHOD
+	Path             string         // route path
+	IsHide           bool           // if set true, this route will not show in route table
+	H                HandlerFunc    // handler for this route
+	Middleware       IMiddlewareCtl // just refer to middleware itself
+	OverrideBasePath bool           // override base path
 }
 
 // emptyRouteItem returns an empty []*RouteItem which won't register any route

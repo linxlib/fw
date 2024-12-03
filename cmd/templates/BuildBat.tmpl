@@ -1,0 +1,65 @@
+@echo off
+:: 设置变量
+set GO_EXECUTABLE={{.Name}}_{{.System}}_{{.Arch}}
+set CONFIG_DIR=config
+set CONFIG_FILE=%CONFIG_DIR%\config.yaml
+set GEN_FILE=gen.json
+set OUTPUT_ZIP=%GO_EXECUTABLE%.zip
+set TEMP_DIR=temp_package
+set GOOS={{.System}}
+set GOARCH={{.Arch}}
+
+:: 确保Go环境已安装
+go version >nul 2>&1
+if errorlevel 1 (
+    echo Error: Go is not installed or not in PATH.
+    exit /b 1
+)
+
+:: 检查Go构建文件是否存在
+if not exist main.go (
+    echo Error: main.go file not found. Ensure you are in the Go project root directory.
+    exit /b 1
+)
+
+:: 编译Go程序
+echo Building Go executable...
+go build -o %GO_EXECUTABLE%
+if errorlevel 1 (
+    echo Error: Failed to build Go program.
+    exit /b 1
+)
+
+:: 检查必要文件是否存在
+if not exist %CONFIG_FILE% (
+    echo Error: %CONFIG_FILE% does not exist.
+    exit /b 1
+)
+
+if not exist %GEN_FILE% (
+    echo Error: %GEN_FILE% does not exist.
+    exit /b 1
+)
+
+:: 确保输出文件夹干净
+if exist %TEMP_DIR% rd /s /q %TEMP_DIR%
+mkdir %TEMP_DIR%
+
+:: 复制文件到临时目录
+echo Copying files...
+copy %GO_EXECUTABLE% %TEMP_DIR% >nul
+xcopy %CONFIG_DIR% %TEMP_DIR%\%CONFIG_DIR% /e /i /q >nul
+copy %GEN_FILE% %TEMP_DIR% >nul
+
+:: 压缩到zip文件
+echo Creating zip package...
+if exist %OUTPUT_ZIP% del %OUTPUT_ZIP%
+powershell Compress-Archive -Path %TEMP_DIR%\* -DestinationPath %OUTPUT_ZIP%
+
+:: 清理临时目录
+rd /s /q %TEMP_DIR%
+if exist %GO_EXECUTABLE% del %GO_EXECUTABLE%
+
+:: 打包完成提示
+echo Packaging completed: %OUTPUT_ZIP%
+pause

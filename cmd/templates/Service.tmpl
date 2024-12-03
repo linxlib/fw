@@ -1,0 +1,22 @@
+package services
+
+import (
+    "github.com/linxlib/fw"
+)
+
+type {{.Name}}Service struct {
+    // list your instance here
+}
+{{if .Config}}
+var _ fw.IServiceConfig = (*{{.Name}}Service)(nil)
+func (s *{{.Name}}Service) InitConfig(config ConfigMapper) {
+    // to be implemented
+}
+{{else}}
+var _ fw.IService = (*{{.Name}}Service)(nil)
+func (s *{{.Name}}Service) Init(provider inject.Provider) {
+    // to be implemented
+}
+{{end}}
+
+// write your codes below

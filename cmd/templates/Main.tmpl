@@ -1,0 +1,23 @@
+package main
+
+import (
+    "github.com/linxlib/fw"
+    "github.com/linxlib/fw_middlewares/recovery"
+    "github.com/linxlib/fw_middlewares/log"
+    "github.com/linxlib/fw_middlewares/cors"
+    "github.com/linxlib/fw_openapi"
+    "{{.PkgName}}/controllers"
+)
+
+func main() {
+    s := fw.New()
+    s.Use(cors.NewDefaultCorsMiddleware())
+    fw_openapi.NewOpenAPIFromFWServer(s)
+    s.Use(recovery.NewRecoveryMiddleware(&recovery.RecoveryOptions{
+        NiceWeb: true,
+        Console: true,
+    }, nil))
+    s.Use(log.NewLoggerMiddleware())
+    s.RegisterRoutes(new(controllers.HelloController))
+    s.Start()
+}

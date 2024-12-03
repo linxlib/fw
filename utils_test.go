@@ -4,8 +4,9 @@ import "testing"
 
 func Test_joinRoute(t *testing.T) {
 	type args struct {
-		base string
-		r    string
+		base     string
+		r        string
+		override bool
 	}
 	tests := []struct {
 		name string
@@ -92,10 +93,19 @@ func Test_joinRoute(t *testing.T) {
 			},
 			want: "/",
 		},
+		{
+			name: "test11",
+			args: args{
+				base:     "/api",
+				r:        "/web",
+				override: true,
+			},
+			want: "/web",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := joinRoute(tt.args.base, tt.args.r); got != tt.want {
+			if got := joinRoute(tt.args.base, tt.args.r, tt.args.override); got != tt.want {
 				t.Errorf("joinRoute() = %v, want %v", got, tt.want)
 			}
 		})

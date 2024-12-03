@@ -1,0 +1,17 @@
+port: {{.Port}}
+listen: {{.Listen}}
+name: "{{.Name}}"
+title: "{{.Title}}"
+showRequestTimeHeader: true
+
+logger:
+    # 0-6, 0: Panic 6: Trace
+    loggerLevel: 5
+    separateLevelFile: false
+    logDir: "./log"
+    rotate: false
+    maxSize: 5
+    maxAge: 28
+    maxBackups: 3
+    compress: false
+    localTime: true

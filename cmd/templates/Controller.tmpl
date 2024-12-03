@@ -1,0 +1,30 @@
+package controllers
+
+import (
+    "github.com/linxlib/fw"
+{{if .Inject}}
+"github.com/linxlib/inject"
+{{end}}
+)
+
+// {{.Name}}Controller
+// @Route /
+// @Controller
+type {{.Name}}Controller struct {}
+{{if .Inject}}
+var _ fw.IController = (*{{.Name}}Controller)(nil)
+
+func (s *{{.Name}}Controller) Init(provider inject.Provider) {
+}
+{{else if .Config}}
+var _ fw.IControllerConfig = (*{{.Name}}Controller)(nil)
+
+func (s *{{.Name}}Controller) InitConfig(config fw.ConfigMapper) {
+}
+{{end}}
+
+// Hello
+// @GET /hello
+func (s *{{.Name}}Controller) Hello(c *fw.Context) {
+    c.JSON(200, map[string]any{"hello": "world"})
+}
