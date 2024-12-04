@@ -704,6 +704,19 @@ func (s *Server) start() chan bool {
 	s.printInfo()
 	return done
 }
+func (s *Server) ListenAddr() string {
+	return s.option.Listen
+}
+func (s *Server) Port() int {
+	return s.option.Port
+}
+func (s *Server) Schema() string {
+	return "http"
+}
+func (s *Server) BasePath() string {
+	return strings.TrimSuffix(s.option.BasePath, "/")
+}
+
 func (s *Server) Start() {
 	done := s.start()
 	for {
