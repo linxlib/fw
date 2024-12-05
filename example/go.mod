@@ -3,7 +3,7 @@ module github.com/linxlib/fw/example
 go 1.22.0
 
 require (
-	github.com/linxlib/astp v0.2.12
+	github.com/linxlib/astp v0.2.15
 	github.com/linxlib/fw v0.0.0-20240731044621-6e5bf246209e
 )
 
@@ -21,7 +21,7 @@ require (
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/linxlib/conv v1.1.1 // indirect
 	github.com/linxlib/inject v0.1.3 // indirect
-	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
@@ -30,8 +30,8 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.57.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/sys v0.26.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/sys v0.27.0 // indirect
+	golang.org/x/text v0.20.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

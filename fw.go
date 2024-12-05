@@ -495,12 +495,8 @@ func (s *Server) wrapM(handler *astp.Element) HandlerFunc {
 	return func(context *Context) {
 		defer func() {
 			if err := recover(); err != nil {
-				if err == "fw" {
-
-				} else if e, ok := err.(error); ok {
-					context.Error(e)
-				} else {
-					s.logger.Error(err)
+				if err != "fw" {
+					panic(err)
 				}
 			}
 		}()
