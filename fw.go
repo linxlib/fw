@@ -69,6 +69,7 @@ func New(key ...string) *Server {
 		middleware:         NewMiddlewareContainer(),
 		routerTreeForPrint: make(map[string][][2]string),
 		beginTime:          time.Now(),
+		plugins:            make([]IPlugin, 0),
 	}
 	s.conf = config.New(&config.Option{
 		AutoReload:         true,
@@ -113,19 +114,29 @@ func New(key ...string) *Server {
 
 type Server struct {
 	inject.Injector
-	server     *fasthttp.Server
-	router     *router.Router
-	option     *ServerOption
-	conf       *config.Config
-	parser     *astp.Parser
-	middleware *MiddlewareContainer
-	logger     *logrus.Logger
-	once       sync.Once
-	midGlobals []IMiddlewareCtl
-	//TODO: multiple hooks
-	hookHandler        HookHandler
+	server             *fasthttp.Server
+	router             *router.Router
+	option             *ServerOption
+	conf               *config.Config
+	parser             *astp.Parser
+	middleware         *MiddlewareContainer
+	logger             *logrus.Logger
+	once               sync.Once
+	midGlobals         []IMiddlewareCtl
 	routerTreeForPrint map[string][][2]string
 	beginTime          time.Time
+	plugins            []IPlugin
+}
+
+type IPlugin interface {
+	InitPlugin(s *Server)
+	HandleServerInfo(si []string)
+	HandleStructs(ctl *astp.Element)
+	Print(slot string)
+}
+
+func (s *Server) AddPlugin(plugin IPlugin) {
+	s.plugins = append(s.plugins, plugin)
 }
 
 func (s *Server) configLogger() {
@@ -137,12 +148,6 @@ func (s *Server) configLogger() {
 	logger.SetFormatter(Console())
 	logger.SetLevel(logrus.InfoLevel)
 	logger.SetReportCaller(true)
-
-	//defer func() {
-	//	if err := recover(); err != nil {
-	//		logger.Error(err)
-	//	}
-	//}()
 
 	logger.SetLevel(logrus.Level(s.option.Logger.LoggerLevel))
 	dir := s.option.Logger.LogDir
@@ -205,9 +210,6 @@ func (s *Server) configLogger() {
 
 	s.logger = logger
 	s.Map(s.logger)
-}
-func (s *Server) RegisterHooks(handler HookHandler) {
-	s.hookHandler = handler
 }
 
 type HandlerFunc = func(*Context)
@@ -281,6 +283,10 @@ func (s *Server) RegisterRoute(controller any) {
 				}
 			}
 		}
+		for _, plugin := range s.plugins {
+			plugin.InitPlugin(s)
+		}
+
 	})
 
 	// 遍历代码中所有的 @Controller 标记的结构，按照控制器对待
@@ -329,8 +335,8 @@ func (s *Server) RegisterRoute(controller any) {
 				}
 			}
 		}
-		if s.hookHandler != nil {
-			s.hookHandler.HandleStructs(ctl)
+		for _, plugin := range s.plugins {
+			plugin.HandleStructs(ctl)
 		}
 		//处理控制器方法
 		ctl.VisitElements(astp.ElementMethod, func(element *astp.Element) bool {
@@ -649,9 +655,8 @@ func (s *Server) printInfo() {
 		style3.Printf("%10s", "Network: ")
 		style4.Printf("http://%s:%d%s\n", s.option.IntranetIP, s.option.Port, s.option.BasePath)
 	}
-
-	if s.hookHandler != nil {
-		s.hookHandler.Print(AfterListen)
+	for _, plugin := range s.plugins {
+		plugin.Print(AfterListen)
 	}
 	if s.option.Dev {
 		if runtime.GOOS == "darwin" {
@@ -672,12 +677,13 @@ func (s *Server) Run() chan bool {
 	return s.start()
 }
 func (s *Server) start() chan bool {
-	if s.hookHandler != nil {
+
+	for _, plugin := range s.plugins {
 		for _, file := range s.parser.Files {
 			if !file.IsMain() {
 				continue
 			}
-			s.hookHandler.HandleServerInfo(file.Comments)
+			plugin.HandleServerInfo(file.Comments)
 		}
 	}
 
