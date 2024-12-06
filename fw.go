@@ -261,6 +261,9 @@ func (s *Server) RegisterRoute(controller any) {
 	// 处理全局
 
 	s.once.Do(func() {
+		for _, plugin := range s.plugins {
+			plugin.InitPlugin(s)
+		}
 		s.midGlobals = make([]IMiddlewareCtl, 0)
 		routeItems := make([]*RouteItem, 0)
 		s.middleware.GetGlobal(func(mid IMiddlewareGlobal) bool {
@@ -282,9 +285,6 @@ func (s *Server) RegisterRoute(controller any) {
 					s.addRouteTable("Global", item.Method, joinRoute(s.option.BasePath, item.Path, item.OverrideBasePath), item.Middleware.Name()+".H", "@"+item.Middleware.Name())
 				}
 			}
-		}
-		for _, plugin := range s.plugins {
-			plugin.InitPlugin(s)
 		}
 
 	})
