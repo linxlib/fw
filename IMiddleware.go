@@ -12,6 +12,7 @@ import (
 type AttributeName = string
 type SlotType = string
 
+// MiddlewareContext represents the context in which a middleware is executed.
 type MiddlewareContext struct {
 	ControllerName string
 	MethodName     string
@@ -86,13 +87,15 @@ func (m *MiddlewareContext) GetParam(key string) string {
 }
 
 type IMiddlewareBase interface {
-	// Name returns middleware's name
+	// Name returns the middleware's name
 	Name() string
-	// Attribute returns middleware's Attribute just like Websocket so that you can use it like // @Websocket
+	// Attribute returns the middleware's Attribute just like Websocket so that you can use it like // @Websocket
 	Attribute() AttributeName
 	// GetSlot returns slot type
 	GetSlot() SlotType
 }
+
+// IInitOnce is an interface that will be called only once
 type IInitOnce interface {
 	DoInitOnce()
 }
@@ -118,6 +121,7 @@ type IMiddleware interface {
 
 var _ IMiddleware = (*Middleware)(nil)
 
+// NewMiddleware creates a new Middleware instance
 func NewMiddleware(name string, slot string, attr string) *Middleware {
 	return &Middleware{
 		slot: slot,
@@ -197,6 +201,9 @@ type IMiddlewareCtl interface {
 	Router(ctx *MiddlewareContext) []*RouteItem
 }
 
+// RouteItem is a struct that holds information about a route
+//
+// a Middleware can return a []*RouteItem which will be registered to server
 type RouteItem struct {
 	Method           string         // HTTP METHOD
 	Path             string         // route path
