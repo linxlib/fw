@@ -449,9 +449,20 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 			c.Map(c)
 			continue
 		}
+		cmd := new(attribute.Attribute)
+		//  fix for generic
+		if param.ItemType == astp.ElementGeneric {
+			if param.Item!=nil && (param.Item.ElementType == astp.ElementGeneric || param.Item.ItemType == astp.ElementGeneric) {
+				cmd = attribute.GetLastAttr(param.Item)
+			}
+		} else {
+			cmd = attribute.GetLastAttr(param)
+		}
+
+
 
 		//TODO: 根据请求方法和contentType进行binding
-		cmd := attribute.GetLastAttr(param)
+
 		if (c.Method() == "GET" || c.Method() == "HEAD") && (strings.ToLower(cmd.Name) == "body" || strings.ToLower(cmd.Name) == "json") {
 			//类似不合规的参数, 进行跳过
 			continue
@@ -462,7 +473,7 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 		}
 		//TODO: 是否要兼容 非指针方式声明的参数
 		paramV := reflect.New(param.GetRType().Elem())
-		if strings.ToLower(cmd.Name) == "service" || cmd.Name == "" {
+		if strings.ToLower(cmd.Name) == "service" {
 
 		} else {
 
