@@ -14,7 +14,7 @@ func (s *{{.Name}}Service) InitConfig(config ConfigMapper) {
 }
 {{else}}
 var _ fw.IService = (*{{.Name}}Service)(nil)
-func (s *{{.Name}}Service) Init(provider inject.Provider) {
+func (s *{{.Name}}Service) Init(provider fw.IProvider) {
     // to be implemented
 }
 {{end}}

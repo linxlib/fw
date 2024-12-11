@@ -2,9 +2,6 @@ package controllers
 
 import (
     "github.com/linxlib/fw"
-{{if .Inject}}
-"github.com/linxlib/inject"
-{{end}}
 )
 
 // {{.Name}}Controller
@@ -14,7 +11,7 @@ type {{.Name}}Controller struct {}
 {{if .Inject}}
 var _ fw.IController = (*{{.Name}}Controller)(nil)
 
-func (s *{{.Name}}Controller) Init(provider inject.Provider) {
+func (s *{{.Name}}Controller) Init(provider fw.IProvider) {
 }
 {{else if .Config}}
 var _ fw.IControllerConfig = (*{{.Name}}Controller)(nil)
