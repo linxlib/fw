@@ -6,16 +6,16 @@ require (
 	github.com/fasthttp/router v1.5.3
 	github.com/google/uuid v1.6.0
 	github.com/gookit/color v1.5.4
-	github.com/gookit/goutil v0.6.17
-	github.com/gookit/validate v1.5.2
-	github.com/linxlib/astp v0.2.15
+	github.com/gookit/goutil v0.6.18
+	github.com/gookit/validate v1.5.3
+	github.com/linxlib/astp v0.2.17
 	github.com/linxlib/config v0.2.6
 	github.com/linxlib/conv v1.1.1
 	github.com/linxlib/inject v0.1.3
 	github.com/pterm/pterm v0.12.80
 	github.com/sirupsen/logrus v1.9.3
 	github.com/valyala/bytebufferpool v1.0.0
-	github.com/valyala/fasthttp v1.57.0
+	github.com/valyala/fasthttp v1.58.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 
@@ -27,7 +27,7 @@ require (
 	atomicgo.dev/schedule v0.1.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/containerd/console v1.0.4 // indirect
-	github.com/gookit/filter v1.2.1 // indirect
+	github.com/gookit/filter v1.2.2 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect

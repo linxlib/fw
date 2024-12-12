@@ -16,9 +16,10 @@ type MiddlewareContext struct {
 	ControllerName string
 	MethodName     string
 	Location       SlotType
-	Param          map[SlotType]string
-	RValue         map[SlotType]reflect.Value
-	ParamValues    url.Values
+	param          map[SlotType]string
+	rValue         map[SlotType]reflect.Value
+	paramValues    url.Values
+	rawParams      string
 	Ignored        bool
 	Next           HandlerFunc
 }
@@ -30,7 +31,7 @@ type MiddlewareContext struct {
 // of strings.
 func (m *MiddlewareContext) VisitParams(f func(key string, value []string)) {
 	// Iterate over all key/value pairs in the parameters.
-	for s, i := range m.ParamValues {
+	for s, i := range m.paramValues {
 		f(s, i)
 	}
 }
@@ -38,19 +39,24 @@ func (m *MiddlewareContext) VisitParams(f func(key string, value []string)) {
 // DelParam deletes the value associated with key from middleware context's
 // parameters.
 func (m *MiddlewareContext) DelParam(key string) {
-	m.ParamValues.Del(key)
+	m.paramValues.Del(key)
 }
 
 func (m *MiddlewareContext) SetRValue(v reflect.Value) {
-	m.RValue[m.Location] = v
+	m.rValue[m.Location] = v
 }
 
 func (m *MiddlewareContext) GetRValue() reflect.Value {
-	if ss, ok := m.RValue[m.Location]; ok {
+	if ss, ok := m.rValue[m.Location]; ok {
 		return ss
 	} else {
 		return reflect.Value{}
 	}
+}
+
+// GetRawParams returns the raw parameters of the middleware context.
+func (m *MiddlewareContext) GetRawParams() string {
+	return m.rawParams
 }
 
 // newMiddlewareContext creates a new MiddlewareContext instance.
@@ -61,13 +67,14 @@ func (m *MiddlewareContext) GetRValue() reflect.Value {
 // Returns a pointer to a MiddlewareContext instance.
 func newMiddlewareContext(ctlName, methodName string, location SlotType, param string, next HandlerFunc) *MiddlewareContext {
 	m := &MiddlewareContext{ControllerName: ctlName, MethodName: methodName, Location: location, Next: next}
-	m.Param = make(map[SlotType]string)
-	m.RValue = make(map[SlotType]reflect.Value)
-	m.Param[location] = param
+	m.param = make(map[SlotType]string)
+	m.rValue = make(map[SlotType]reflect.Value)
+	m.param[location] = param
+	m.rawParams = strings.TrimSpace(param)
 	var err error
-	m.ParamValues, err = url.ParseQuery(param)
+	m.paramValues, err = url.ParseQuery(param)
 	if err != nil {
-		m.ParamValues = make(url.Values)
+		m.paramValues = make(url.Values)
 	}
 	return m
 }
@@ -78,7 +85,7 @@ func newMiddlewareContext(ctlName, methodName string, location SlotType, param s
 // If the key is present in the map, the value (string) is returned.
 // If the key is not present in the map, an empty string is returned.
 func (m *MiddlewareContext) GetParam(key string) string {
-	if ss, ok := m.ParamValues[key]; ok {
+	if ss, ok := m.paramValues[key]; ok {
 		return strings.Join(ss, ",")
 	} else {
 		return ""
