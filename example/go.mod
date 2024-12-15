@@ -3,7 +3,7 @@ module github.com/linxlib/fw/example
 go 1.22.0
 
 require (
-	github.com/linxlib/astp v0.2.16
+	github.com/linxlib/astp v0.2.17
 	github.com/linxlib/fw v0.0.0-20240731044621-6e5bf246209e
 )
 
@@ -15,7 +15,7 @@ require (
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/gookit/filter v1.2.2 // indirect
 	github.com/gookit/goutil v0.6.18 // indirect
-	github.com/gookit/validate v1.5.2 // indirect
+	github.com/gookit/validate v1.5.3 // indirect
 	github.com/jinzhu/configor v1.2.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
