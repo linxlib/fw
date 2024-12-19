@@ -3,7 +3,7 @@ module github.com/linxlib/fw/example
 go 1.22.0
 
 require (
-	github.com/linxlib/astp v0.2.19
+	github.com/linxlib/astp v0.2.20
 	github.com/linxlib/fw v0.0.0-20240731044621-6e5bf246209e
 )
 
