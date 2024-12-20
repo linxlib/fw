@@ -367,13 +367,15 @@ func (s *Server) RegisterRoute(controller any) {
 			attrs, next := s.handle(ctl, method)
 			// 然后处理controller上的中间件
 			for _, mid := range middlewareCtls {
-				attrs = append(attrs, mid.Attribute())
+
 				ctx := newMiddlewareContext(ctl.Name, method.Name, SlotMethod, "", next)
 				ctx.SetRValue(ctl.GetRValue())
 				// 如果方法上打了 @Ignore Auth 则需要忽略 Auth这个代表 AuthMiddleware 的中间件
 				//TODO: 是否需要处理 @Ignore 多个的情况？
 				if toIgnore == strings.ToUpper(mid.Attribute()) {
 					ctx.Ignored = true
+				} else {
+					attrs = append(attrs, mid.Attribute())
 				}
 				next = mid.Execute(ctx)
 			}
@@ -452,14 +454,12 @@ func (s *Server) bind(c *Context, handler *astp.Element) error {
 		cmd := new(attribute.Attribute)
 		//  fix for generic
 		if param.ItemType == astp.ElementGeneric {
-			if param.Item!=nil && (param.Item.ElementType == astp.ElementGeneric || param.Item.ItemType == astp.ElementGeneric) {
+			if param.Item != nil && (param.Item.ElementType == astp.ElementGeneric || param.Item.ItemType == astp.ElementGeneric) {
 				cmd = attribute.GetLastAttr(param.Item)
 			}
 		} else {
 			cmd = attribute.GetLastAttr(param)
 		}
-
-
 
 		//TODO: 根据请求方法和contentType进行binding
 
