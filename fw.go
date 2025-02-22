@@ -17,6 +17,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	"os"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -393,23 +394,41 @@ func (s *Server) RegisterRoute(controller any) {
 				sig.WriteString("@")
 				sig.WriteString(attr)
 			}
+			if len(hms) <= 0 {
+				a, b, ok := handleDefaultMethodRoute(method.Name, !method.Private())
+				if ok {
+					s.registerRoute(a, joinRoute(base, b), next)
+					receiver := method.MustGetElement(astp.ElementReceiver)
+					controllerName := receiver.TypeString
+					route := joinRoute(base, b)
+					if method.FromParent {
+						if sig.Len() != 0 {
+							sig.WriteRune(',')
+						}
 
-			for i, hm := range hms {
-				err := s.registerRoute(strings.ToUpper(hm), joinRoute(base, rps[i]), next)
-				if err != nil {
-					continue
-				}
-				receiver := method.MustGetElement(astp.ElementReceiver)
-				controllerName := receiver.TypeString
-				route := joinRoute(base, rps[i])
-				if method.FromParent {
-					if sig.Len() != 0 {
-						sig.WriteRune(',')
+						sig.WriteString("@inherit")
 					}
-
-					sig.WriteString("@inherit")
+					s.addRouteTable(controllerName, a, route, method.Name, sig.String())
 				}
-				s.addRouteTable(controllerName, strings.ToUpper(hm), route, method.Name, sig.String())
+
+			} else {
+				for i, hm := range hms {
+					err := s.registerRoute(strings.ToUpper(hm), joinRoute(base, rps[i]), next)
+					if err != nil {
+						continue
+					}
+					receiver := method.MustGetElement(astp.ElementReceiver)
+					controllerName := receiver.TypeString
+					route := joinRoute(base, rps[i])
+					if method.FromParent {
+						if sig.Len() != 0 {
+							sig.WriteRune(',')
+						}
+
+						sig.WriteString("@inherit")
+					}
+					s.addRouteTable(controllerName, strings.ToUpper(hm), route, method.Name, sig.String())
+				}
 			}
 
 		})
@@ -441,6 +460,31 @@ func (s *Server) registerRoute(method string, path string, f HandlerFunc) error 
 	}
 
 	return nil
+}
+
+func handleDefaultMethodRoute(name string, isPublic bool) (method, path string, ok bool) {
+	if !isPublic {
+		return "", "", false
+	}
+	// 1. 提取HTTP方法（GET, POST, PUT等），忽略大小写
+	httpMethods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "ANY", "WS"}
+	methodName := name
+	for _, m := range httpMethods {
+		if strings.HasPrefix(strings.ToUpper(methodName), m) {
+			method = m
+			methodName = methodName[len(m):] // 去掉方法前缀
+			break
+		}
+	}
+	if method == "" {
+		return "", "", false
+	}
+	// 2. 将剩余部分转为snake_case
+	// 使用正则表达式查找大写字母并将其转换为小写字母前面加下划线
+	re := regexp.MustCompile("([a-z0-9])([A-Z])")
+	snakeCase := re.ReplaceAllString(methodName, `${1}_${2}`)
+	snakeCase = strings.ToLower(snakeCase) // 转为小写
+	return methodName, "/" + snakeCase, true
 }
 
 func (s *Server) bind(c *Context, handler *astp.Element) error {
