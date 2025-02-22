@@ -290,8 +290,8 @@ func (s *Server) RegisterRoute(controller any) {
 	})
 
 	// 遍历代码中所有的 @Controller 标记的结构，按照控制器对待
-	s.parser.VisitStruct(func(element *astp.Element) bool {
-		return element.Name == typ.Name() && (attribute.HasAttribute(element, controllerAttr) || strings.HasSuffix(element.Name, controllerAttr))
+	s.parser.VisitStructByName(typ.Name(), func(element *astp.Element) bool {
+		return attribute.HasAttribute(element, controllerAttr) || strings.HasSuffix(element.Name, controllerAttr)
 	}, func(ctl *astp.Element) {
 
 		// 第一层路由 【配置文件】
