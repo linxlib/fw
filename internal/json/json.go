@@ -90,7 +90,7 @@ func timeFmtEncoder2(format, location string) jsoniter.EncoderFunc {
 
 		tp := (**time.Time)(ptr)
 		var str string
-		if tp != nil {
+		if *tp != nil {
 			l, err := time.LoadLocation(location)
 			if err != nil {
 				stream.Error = err
