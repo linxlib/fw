@@ -28,6 +28,7 @@ func init() {
 
 var (
 	timeType            = reflect2.TypeOf(time.Time{})
+	timeType2           = reflect2.TypeOf((*time.Time)(nil))
 	timeFormatTag       = "format"
 	timeLocationTag     = "location"
 	defaultTimeFormat   = time.DateTime
@@ -65,7 +66,39 @@ func timeFmtBinder() Binder {
 			}
 			binding.Encoder = encdec
 			binding.Decoder = encdec
+		} else if typ == timeType2 {
+			format, ok := binding.Field.Tag().Lookup(timeFormatTag)
+			if !ok {
+				format = defaultTimeFormat
+			}
+			location, ok := binding.Field.Tag().Lookup(timeLocationTag)
+			if !ok {
+				location = defaultTimeLocation
+			}
+			encdec := &encoderdecoder{
+				encFn: timeFmtEncoder2(format, location),
+				decFn: timeFmtDecoder2(format, location),
+			}
+			binding.Encoder = encdec
+			binding.Decoder = encdec
 		}
+	})
+}
+
+func timeFmtEncoder2(format, location string) jsoniter.EncoderFunc {
+	return jsoniter.EncoderFunc(func(ptr unsafe.Pointer, stream *jsoniter.Stream) {
+
+		tp := (**time.Time)(ptr)
+		var str string
+		if tp != nil {
+			l, err := time.LoadLocation(location)
+			if err != nil {
+				stream.Error = err
+				return
+			}
+			str = (*tp).In(l).Format(format)
+		}
+		stream.WriteString(str)
 	})
 }
 func timeFmtEncoder(format, location string) jsoniter.EncoderFunc {
@@ -105,6 +138,31 @@ func timeFmtDecoder(format, location string) jsoniter.DecoderFunc {
 		}
 		tp := (*time.Time)(ptr)
 		*tp = t
+	})
+}
+func timeFmtDecoder2(format, location string) jsoniter.DecoderFunc {
+	return jsoniter.DecoderFunc(func(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
+		str := iter.ReadString()
+		var (
+			l   *time.Location
+			t   time.Time
+			err error
+		)
+		if str != "" {
+			l, err = time.LoadLocation(location)
+			if err != nil {
+				iter.Error = err
+				return
+			}
+			t, err = time.ParseInLocation(format, str, l)
+			if err != nil {
+				iter.Error = err
+				return
+			}
+		}
+		tp := (**time.Time)(ptr)
+		*tp = &t
+		**tp = t
 	})
 }
 
