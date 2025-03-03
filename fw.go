@@ -587,7 +587,7 @@ func (s *Server) wrapM(handler *astp.Element) HandlerFunc {
 			} else { // If there is no error return value, the return value will be treated as a normal return.
 				// and only one return value will be written into response body
 				if !context.hasReturn {
-					context.PureJSON(200, values[0].Interface())
+					context.JSON(200, values[0].Interface())
 				}
 			}
 		} else {
@@ -596,7 +596,7 @@ func (s *Server) wrapM(handler *astp.Element) HandlerFunc {
 				if values[0].IsNil() {
 					context.Status(200)
 				} else {
-					context.PureJSON(200, values[0].Interface())
+					context.JSON(200, values[0].Interface())
 				}
 
 			}
