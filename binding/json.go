@@ -25,7 +25,7 @@ func (jsonBinding) Name() string {
 }
 
 func (jsonBinding) Bind(req *fasthttp.RequestCtx, obj any) error {
-	if req == nil || req.PostBody() == nil {
+	if req == nil || req.PostBody() == nil || len(req.PostBody()) <= 0 {
 		return nil
 	}
 

@@ -3,7 +3,7 @@ package binding
 import (
 	valid "github.com/gookit/validate"
 	"github.com/gookit/validate/locales/zhcn"
-	"github.com/linxlib/fw/attribute"
+	"github.com/linxlib/astp/constants"
 	"github.com/valyala/fasthttp"
 	"strings"
 )
@@ -140,8 +140,8 @@ func Get(cmd string) Binding {
 		return JSON
 	}
 }
-func GetByAttr(attr *attribute.Attribute) Binding {
-	return Get(strings.ToLower(attr.Name))
+func GetByAttr(attr constants.AttrType) Binding {
+	return Get(strings.ToLower(constants.AttrNames[attr]))
 }
 func IsBodyBinder(bind Binding) bool {
 	return bind == JSON || bind == XML || bind == Form || bind == FormMultipart || bind == Plain
