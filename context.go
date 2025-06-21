@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"github.com/gookit/goutil/errorx"
 	"github.com/linxlib/conv"
+	"github.com/linxlib/fw/inject"
 	"github.com/linxlib/fw/render"
-	"github.com/linxlib/inject"
+
 	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp"
 	"html/template"

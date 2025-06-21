@@ -1,8 +1,8 @@
 module github.com/linxlib/fw
 
-go 1.23.0
+go 1.24
 
-toolchain go1.24.1
+toolchain go1.24.4
 
 require (
 	github.com/fasthttp/router v1.5.4
@@ -11,10 +11,9 @@ require (
 	github.com/gookit/goutil v0.6.18
 	github.com/gookit/validate v1.5.5
 	github.com/json-iterator/go v1.1.12
-	github.com/linxlib/astp v0.3.2
+	github.com/linxlib/astp v0.4.0
 	github.com/linxlib/config v0.2.6
 	github.com/linxlib/conv v1.1.1
-	github.com/linxlib/inject v0.1.3
 	github.com/modern-go/reflect2 v1.0.2
 	github.com/pterm/pterm v0.12.81
 	github.com/sirupsen/logrus v1.9.3
@@ -24,8 +23,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 
 )
-
-replace github.com/linxlib/astp => ../../linxlib/astp
 
 require (
 	atomicgo.dev/cursor v0.2.0 // indirect

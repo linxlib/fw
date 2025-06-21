@@ -1,7 +1,7 @@
 package fw
 
 import (
-	"github.com/linxlib/inject"
+	"github.com/linxlib/fw/inject"
 )
 
 // ConfigMapper is the interface for config mapper

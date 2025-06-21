@@ -10,9 +10,9 @@ import (
 	types2 "github.com/linxlib/astp/types"
 	"github.com/linxlib/config"
 	"github.com/linxlib/fw/binding"
+	"github.com/linxlib/fw/inject"
 	"github.com/linxlib/fw/internal"
 	"github.com/linxlib/fw/types"
-	"github.com/linxlib/inject"
 	"github.com/pterm/pterm"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
@@ -548,7 +548,11 @@ func (s *Server) bind(c *Context, handler *types2.Function) error {
 		if err := binder.Bind(c.GetFastContext(), paramV.Interface()); err != nil {
 			return err
 		}
-		c.Map(paramV.Interface())
+		if paramV.CanInterface() {
+			c.Map(paramV.Interface())
+		} else {
+			c.Map(paramV.Elem().Interface())
+		}
 
 	}
 
@@ -560,7 +564,14 @@ func (s *Server) wrapM(handler *types2.Function) HandlerFunc {
 		defer func() {
 			if err := recover(); err != nil {
 				if err != "fw" {
-					context.Error(err.(error))
+					switch err1 := err.(type) {
+					case error:
+						panic(err1)
+						//context.Error(err1.(error))
+					case string:
+						panic(err1)
+					}
+
 				}
 			}
 		}()
@@ -571,7 +582,8 @@ func (s *Server) wrapM(handler *types2.Function) HandlerFunc {
 		//	panic(err)
 		//}
 		// call method
-		values, err := context.Invoke(handler.GetValue())
+
+		values, err := context.inj.Invoke(handler.GetValue())
 		if err != nil {
 			panic(err)
 		}
