@@ -17,10 +17,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/natefinch/lumberjack.v2"
+	"log/slog"
 	"os"
 	"reflect"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -558,21 +560,35 @@ func (s *Server) bind(c *Context, handler *types2.Function) error {
 
 	return nil
 }
-
+func callers(skip int) {
+	pcs := make([]uintptr, 1024)
+	runtime.Callers(skip+2, pcs)
+	frames := runtime.CallersFrames(pcs)
+	for {
+		frame, more := frames.Next()
+		fmt.Println(frame.File+":"+strconv.Itoa(frame.Line), frame.Function)
+		if !more {
+			break
+		}
+	}
+}
 func (s *Server) wrapM(handler *types2.Function) HandlerFunc {
 	return func(context *Context) {
 		defer func() {
 			if err := recover(); err != nil {
-				if err != "fw" {
-					switch err1 := err.(type) {
-					case error:
-						panic(err1)
-						//context.Error(err1.(error))
-					case string:
+
+				switch err1 := err.(type) {
+				case error:
+					slog.Error(err1.Error())
+					callers(2)
+					//panic(err1)
+					//context.Error(err1.(error))
+				case string:
+					if err != "fw" {
 						panic(err1)
 					}
-
 				}
+
 			}
 		}()
 		var err error
