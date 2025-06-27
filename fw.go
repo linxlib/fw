@@ -735,7 +735,7 @@ func (s *Server) printInfo() {
 	//color.Printf("%s %s %s\n", color.HiGreen.Sprintf("FW %s", Version), color.Gray.Sprint("ready in"), color.HiWhite.Sprint("568ms"))
 	style.Print("  ➜ ")
 	style3.Printf("%10s", "Local: ")
-	style4.Printf("http://%s:%d%s\n", "localhost", s.option.Port, s.option.BasePath)
+	style4.Printf("http://%s:%d%s\n", s.option.Listen, s.option.Port, s.option.BasePath)
 	if s.CanAccessByLan() {
 		style.Print("  ➜ ")
 		style3.Printf("%10s", "Network: ")
