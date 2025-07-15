@@ -594,9 +594,9 @@ func (s *Server) wrapM(handler *types2.Function) HandlerFunc {
 		var err error
 		// binding params
 		err = s.bind(context, handler)
-		//if err != nil {
-		//	panic(err)
-		//}
+		if err != nil {
+			context.ErrorExit(err)
+		}
 		// call method
 
 		values, err := context.inj.Invoke(handler.GetValue())

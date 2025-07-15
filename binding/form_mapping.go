@@ -327,7 +327,7 @@ func setFloatField(val string, bitSize int, field reflect.Value) error {
 func setTimeField(val string, structField reflect.StructField, value reflect.Value) error {
 	timeFormat := structField.Tag.Get("time_format")
 	if timeFormat == "" {
-		timeFormat = time.RFC3339
+		timeFormat = time.DateTime
 	}
 
 	switch tf := strings.ToLower(timeFormat); tf {
