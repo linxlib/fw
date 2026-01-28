@@ -11,7 +11,7 @@ require (
 	github.com/gookit/goutil v0.7.3
 	github.com/gookit/validate v1.5.6
 	github.com/json-iterator/go v1.1.12
-	github.com/linxlib/astp v0.4.3
+	github.com/linxlib/astp v0.4.4
 	github.com/linxlib/config v0.2.6
 	github.com/linxlib/conv v1.1.1
 	github.com/modern-go/reflect2 v1.0.2
