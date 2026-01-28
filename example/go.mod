@@ -5,18 +5,18 @@ go 1.24
 toolchain go1.24.4
 
 require (
-	github.com/linxlib/astp v0.4.0
+	github.com/linxlib/astp v0.4.2
 	github.com/linxlib/fw v0.0.0-20240731044621-6e5bf246209e
 )
 
 require (
 	github.com/BurntSushi/toml v1.3.2 // indirect
-	github.com/andybalholm/brotli v1.1.1 // indirect
+	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/fasthttp/router v1.5.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/gookit/filter v1.2.2 // indirect
-	github.com/gookit/goutil v0.6.18 // indirect
+	github.com/gookit/goutil v0.7.0 // indirect
 	github.com/gookit/validate v1.5.5 // indirect
 	github.com/jinzhu/configor v1.2.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -30,7 +30,7 @@ require (
 	github.com/savsgio/gotils v0.0.0-20250408102913-196191ec6287 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.62.0 // indirect
+	github.com/valyala/fasthttp v1.63.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
