@@ -611,7 +611,7 @@ func (s *Server) wrapM(handler *types2.Function) HandlerFunc {
 			return
 		}
 
-		if err := values[last]; !err.IsZero() {
+		if err := values[last]; !err.IsNil() {
 			// if the last return value is error, parse it and write error info into response body
 			if e, ok := err.Interface().(error); ok {
 				context.ErrorExit(e)

@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.4
 
 require (
-	github.com/linxlib/astp v0.4.3
+	github.com/linxlib/astp v0.4.4
 	github.com/linxlib/fw v0.0.0-20240731044621-6e5bf246209e
 )
 
