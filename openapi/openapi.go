@@ -19,14 +19,34 @@ type RouteInfo struct {
 	Parameters           []Parameter
 	RequestBody          *RequestBody
 	ResponseSchema       *Schema
+	Security             []SecurityRequirement
+}
+
+// SecurityRequirement maps a security scheme name to its scopes (empty for most cases).
+type SecurityRequirement map[string][]string
+
+// SecurityScheme represents an OpenAPI security scheme definition.
+type SecurityScheme struct {
+	Type         string `json:"type"`
+	Scheme       string `json:"scheme,omitempty"`
+	BearerFormat string `json:"bearerFormat,omitempty"`
+	In           string `json:"in,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Description  string `json:"description,omitempty"`
+}
+
+// Components holds reusable OpenAPI components.
+type Components struct {
+	SecuritySchemes map[string]SecurityScheme `json:"securitySchemes,omitempty"`
 }
 
 type Document struct {
-	OpenAPI string                 `json:"openapi"`
-	Info    Info                   `json:"info"`
-	Paths   map[string]PathItem    `json:"paths"`
-	Tags    []Tag                  `json:"tags,omitempty"`
-	Extra   map[string]interface{} `json:"-"`
+	OpenAPI    string                 `json:"openapi"`
+	Info       Info                   `json:"info"`
+	Paths      map[string]PathItem    `json:"paths"`
+	Tags       []Tag                  `json:"tags,omitempty"`
+	Components *Components            `json:"components,omitempty"`
+	Extra      map[string]interface{} `json:"-"`
 }
 
 type Tag struct {
@@ -49,6 +69,7 @@ type Operation struct {
 	Parameters  []Parameter              `json:"parameters,omitempty"`
 	RequestBody *RequestBody             `json:"requestBody,omitempty"`
 	Responses   map[string]ResponseEntry `json:"responses"`
+	Security    []SecurityRequirement    `json:"security,omitempty"`
 }
 
 type Parameter struct {
@@ -84,7 +105,7 @@ type ResponseEntry struct {
 	Content     map[string]MediaType `json:"content,omitempty"`
 }
 
-func Generate(outputPath string, title string, version string, routes []RouteInfo) error {
+func Generate(outputPath string, title string, version string, routes []RouteInfo, securitySchemes map[string]SecurityScheme) error {
 	if outputPath == "" {
 		outputPath = "openapi.json"
 	}
@@ -132,7 +153,7 @@ func Generate(outputPath string, title string, version string, routes []RouteInf
 		if summary == "" {
 			summary = strings.ToUpper(method) + " " + p
 		}
-		item[method] = Operation{
+		op := Operation{
 			OperationID: opID,
 			Summary:     summary,
 			Tags:        nilIfEmpty(route.TagName),
@@ -142,7 +163,14 @@ func Generate(outputPath string, title string, version string, routes []RouteInf
 				"200": resp,
 			},
 		}
+		if len(route.Security) > 0 {
+			op.Security = route.Security
+		}
+		item[method] = op
 		doc.Paths[p] = item
+	}
+	if len(securitySchemes) > 0 {
+		doc.Components = &Components{SecuritySchemes: securitySchemes}
 	}
 	if len(tagMap) > 0 {
 		names := make([]string, 0, len(tagMap))

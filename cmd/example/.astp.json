@@ -1,0 +1,743 @@
+{
+  "packages": {
+    "github.com/linxlib/fw/cmd/example": {
+      "name": "main",
+      "path": "github.com/linxlib/fw/cmd/example",
+      "types": {
+        "AuthorizationMiddleware": {
+          "name": "AuthorizationMiddleware",
+          "pkg_path": "github.com/linxlib/fw/cmd/example",
+          "kind": "struct",
+          "methods": [
+            {
+              "name": "Spec",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "AuthorizationMiddleware",
+                "kind": "struct"
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "AnnotationSpec",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "SecurityScheme",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "AuthorizationMiddleware",
+                "kind": "struct"
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "SecurityScheme",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Handle",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "AuthorizationMiddleware",
+                "kind": "struct"
+              },
+              "params": [
+                {
+                  "name": "ctx",
+                  "type": {
+                    "name": "Context",
+                    "pkg_path": "ctxpkg",
+                    "kind": "struct"
+                  }
+                },
+                {
+                  "name": "args",
+                  "type": {
+                    "name": "AnnotationArgs",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                },
+                {
+                  "name": "next",
+                  "type": {
+                    "name": "Handler",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "error",
+                    "kind": "basic"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "LogMiddleware": {
+          "name": "LogMiddleware",
+          "pkg_path": "github.com/linxlib/fw/cmd/example",
+          "kind": "struct",
+          "methods": [
+            {
+              "name": "Spec",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "LogMiddleware",
+                "kind": "struct"
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "AnnotationSpec",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Handle",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "LogMiddleware",
+                "kind": "struct"
+              },
+              "params": [
+                {
+                  "name": "ctx",
+                  "type": {
+                    "name": "Context",
+                    "pkg_path": "ctxpkg",
+                    "kind": "struct"
+                  }
+                },
+                {
+                  "name": "args",
+                  "type": {
+                    "name": "AnnotationArgs",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                },
+                {
+                  "name": "next",
+                  "type": {
+                    "name": "Handler",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "error",
+                    "kind": "basic"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "SSEMiddleware": {
+          "name": "SSEMiddleware",
+          "pkg_path": "github.com/linxlib/fw/cmd/example",
+          "kind": "struct",
+          "methods": [
+            {
+              "name": "Spec",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "SSEMiddleware",
+                "kind": "struct"
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "AnnotationSpec",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Handle",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "SSEMiddleware",
+                "kind": "struct"
+              },
+              "params": [
+                {
+                  "name": "ctx",
+                  "type": {
+                    "name": "Context",
+                    "pkg_path": "ctxpkg",
+                    "kind": "struct"
+                  }
+                },
+                {
+                  "name": "_",
+                  "type": {
+                    "name": "AnnotationArgs",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                },
+                {
+                  "name": "next",
+                  "type": {
+                    "name": "Handler",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "error",
+                    "kind": "basic"
+                  }
+                }
+              ]
+            }
+          ],
+          "doc": {
+            "list": [
+              {
+                "text": "SSEMiddleware sets up a Server-Sent Events stream. The middleware calls"
+              },
+              {
+                "text": "ctx.SSE() to establish the stream, then invokes next inside the stream"
+              },
+              {
+                "text": "callback so the handler can use the SSEWriter to push events."
+              },
+              {
+                "text": ""
+              },
+              {
+                "text": "The handler method receives *ctxpkg.SSEWriter as a parameter via DI."
+              }
+            ]
+          }
+        },
+        "UserController": {
+          "name": "UserController",
+          "pkg_path": "github.com/linxlib/fw/cmd/example",
+          "kind": "struct",
+          "methods": [
+            {
+              "name": "ModifyUser",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "UserController",
+                "kind": "pointer"
+              },
+              "params": [
+                {
+                  "name": "ctx",
+                  "type": {
+                    "name": "Context",
+                    "pkg_path": "ctxpkg",
+                    "kind": "struct"
+                  }
+                },
+                {
+                  "name": "query",
+                  "type": {
+                    "name": "UserQuery",
+                    "kind": "struct"
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "int",
+                    "kind": "basic"
+                  }
+                },
+                {
+                  "name": "",
+                  "type": {
+                    "name": "error",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "ModifyUser 修改用户"
+                  },
+                  {
+                    "text": "@POST /user"
+                  },
+                  {
+                    "text": "@POST /user_info"
+                  },
+                  {
+                    "text": "@Log(stage=before)"
+                  }
+                ],
+                "annotations": [
+                  "POST",
+                  "POST",
+                  "Log"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "POST",
+                    "raw": "@POST /user",
+                    "args": [
+                      "/user"
+                    ]
+                  },
+                  {
+                    "name": "POST",
+                    "raw": "@POST /user_info",
+                    "args": [
+                      "/user_info"
+                    ]
+                  },
+                  {
+                    "name": "Log",
+                    "raw": "@Log(stage=before)",
+                    "kv": {
+                      "stage": "before"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "HealthCheck",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "UserController",
+                "kind": "pointer"
+              },
+              "params": [
+                {
+                  "name": "ctx",
+                  "type": {
+                    "name": "Context",
+                    "pkg_path": "ctxpkg",
+                    "kind": "struct"
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "error",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "HealthCheck 健康检查（无需鉴权）"
+                  },
+                  {
+                    "text": "@GET /health"
+                  },
+                  {
+                    "text": "@Ignore(Authorization)"
+                  }
+                ],
+                "annotations": [
+                  "GET",
+                  "Ignore"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /health",
+                    "args": [
+                      "/health"
+                    ]
+                  },
+                  {
+                    "name": "Ignore",
+                    "raw": "@Ignore(Authorization)",
+                    "args": [
+                      "Authorization"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Echo",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "UserController",
+                "kind": "pointer"
+              },
+              "params": [
+                {
+                  "name": "ctx",
+                  "type": {
+                    "name": "Context",
+                    "pkg_path": "ctxpkg",
+                    "kind": "struct"
+                  }
+                },
+                {
+                  "name": "msg",
+                  "type": {
+                    "kind": "slice",
+                    "elem_type": {
+                      "name": "byte",
+                      "kind": "basic"
+                    }
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "error",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Echo handles WebSocket messages. Each incoming []byte is echoed back with a prefix."
+                  },
+                  {
+                    "text": "@GET /ws"
+                  },
+                  {
+                    "text": "@WS"
+                  },
+                  {
+                    "text": "@Ignore(Authorization)"
+                  }
+                ],
+                "annotations": [
+                  "GET",
+                  "WS",
+                  "Ignore"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /ws",
+                    "args": [
+                      "/ws"
+                    ]
+                  },
+                  {
+                    "name": "WS",
+                    "raw": "@WS"
+                  },
+                  {
+                    "name": "Ignore",
+                    "raw": "@Ignore(Authorization)",
+                    "args": [
+                      "Authorization"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Stream",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "UserController",
+                "kind": "pointer"
+              },
+              "params": [
+                {
+                  "name": "ctx",
+                  "type": {
+                    "name": "Context",
+                    "pkg_path": "ctxpkg",
+                    "kind": "struct"
+                  }
+                },
+                {
+                  "name": "w",
+                  "type": {
+                    "name": "SSEWriter",
+                    "pkg_path": "ctxpkg",
+                    "kind": "pointer"
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "error",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Stream demonstrates Server-Sent Events. The handler receives an SSEWriter"
+                  },
+                  {
+                    "text": "and pushes a series of events to the client."
+                  },
+                  {
+                    "text": "@GET /stream"
+                  },
+                  {
+                    "text": "@SSE"
+                  }
+                ],
+                "annotations": [
+                  "GET",
+                  "SSE"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /stream",
+                    "args": [
+                      "/stream"
+                    ]
+                  },
+                  {
+                    "name": "SSE",
+                    "raw": "@SSE"
+                  }
+                ]
+              }
+            }
+          ],
+          "doc": {
+            "list": [
+              {
+                "text": "---------------------------------------------------------------------------"
+              },
+              {
+                "text": "UserController 用户"
+              },
+              {
+                "text": "@Route /api/v1"
+              },
+              {
+                "text": "@Authorization(Admin)"
+              },
+              {
+                "text": "---------------------------------------------------------------------------"
+              }
+            ],
+            "annotations": [
+              "Route",
+              "Authorization"
+            ],
+            "parsed_annotations": [
+              {
+                "name": "Route",
+                "raw": "@Route /api/v1",
+                "args": [
+                  "/api/v1"
+                ]
+              },
+              {
+                "name": "Authorization",
+                "raw": "@Authorization(Admin)",
+                "args": [
+                  "Admin"
+                ]
+              }
+            ]
+          }
+        },
+        "UserQuery": {
+          "name": "UserQuery",
+          "pkg_path": "github.com/linxlib/fw/cmd/example",
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "Name",
+              "type": {
+                "name": "string",
+                "kind": "basic"
+              },
+              "tag": {
+                "required": "true"
+              },
+              "doc": {
+                "list": [
+                  {
+                    "text": "name"
+                  }
+                ]
+              },
+              "embedded": false
+            },
+            {
+              "name": "Age",
+              "type": {
+                "name": "int",
+                "kind": "basic"
+              },
+              "doc": {
+                "list": [
+                  {
+                    "text": "年龄"
+                  }
+                ]
+              },
+              "embedded": false
+            }
+          ]
+        },
+        "WebSocketMiddleware": {
+          "name": "WebSocketMiddleware",
+          "pkg_path": "github.com/linxlib/fw/cmd/example",
+          "kind": "struct",
+          "methods": [
+            {
+              "name": "Spec",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "WebSocketMiddleware",
+                "kind": "struct"
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "AnnotationSpec",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Handle",
+              "pkg_path": "github.com/linxlib/fw/cmd/example",
+              "recv": {
+                "name": "WebSocketMiddleware",
+                "kind": "struct"
+              },
+              "params": [
+                {
+                  "name": "ctx",
+                  "type": {
+                    "name": "Context",
+                    "pkg_path": "ctxpkg",
+                    "kind": "struct"
+                  }
+                },
+                {
+                  "name": "args",
+                  "type": {
+                    "name": "AnnotationArgs",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                },
+                {
+                  "name": "next",
+                  "type": {
+                    "name": "Handler",
+                    "pkg_path": "middleware",
+                    "kind": "struct"
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "error",
+                    "kind": "basic"
+                  }
+                }
+              ]
+            }
+          ],
+          "doc": {
+            "list": [
+              {
+                "text": "WebSocketMiddleware upgrades the HTTP connection to WebSocket, then enters"
+              },
+              {
+                "text": "a message loop. For each incoming message it injects the raw []byte into"
+              },
+              {
+                "text": "the DI container and calls next (the handler method). The handler receives"
+              },
+              {
+                "text": "the []byte as a parameter and returns []byte as a reply that is sent back"
+              },
+              {
+                "text": "to the client."
+              },
+              {
+                "text": ""
+              },
+              {
+                "text": "The middleware also stores the *websocket.Conn on the context so the handler"
+              },
+              {
+                "text": "can do advanced operations if needed (e.g. close, ping)."
+              }
+            ]
+          }
+        }
+      },
+      "functions": {},
+      "variables": {},
+      "constants": {
+        "Authorization_KeyUserID": {
+          "name": "Authorization_KeyUserID",
+          "pkg_path": "github.com/linxlib/fw/cmd/example",
+          "value": "\"Authorization.UserID\""
+        },
+        "Authorization_KeyUserRole": {
+          "name": "Authorization_KeyUserRole",
+          "pkg_path": "github.com/linxlib/fw/cmd/example",
+          "value": "\"Authorization.UserRole\""
+        },
+        "WS_KeyConn": {
+          "name": "WS_KeyConn",
+          "pkg_path": "github.com/linxlib/fw/cmd/example",
+          "value": "\"WS.Conn\""
+        }
+      }
+    }
+  }
+}

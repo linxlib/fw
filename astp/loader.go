@@ -3,6 +3,7 @@ package astp
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -55,4 +56,24 @@ func Load(path string) (*Project, error) {
 		return nil, err
 	}
 	return l.Project(), nil
+}
+
+// LoadFromBytes parses a Project from in-memory JSON data.
+// This is typically used with go:embed to load pre-generated .astp.json
+// without requiring the file to exist on disk.
+func LoadFromBytes(data []byte) (*Project, error) {
+	p := &Project{}
+	if err := json.Unmarshal(data, p); err != nil {
+		return nil, fmt.Errorf("unmarshal astp data: %w", err)
+	}
+	return p, nil
+}
+
+// LoadFromReader parses a Project from an io.Reader.
+func LoadFromReader(r io.Reader) (*Project, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("read astp data: %w", err)
+	}
+	return LoadFromBytes(data)
 }

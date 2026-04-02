@@ -1,79 +1,40 @@
 package main
 
 import (
-	"fmt"
+	_ "embed"
+	"log"
 
 	"github.com/linxlib/fw/app"
-	ctxpkg "github.com/linxlib/fw/context"
-	"github.com/linxlib/fw/middleware"
-	"github.com/valyala/fasthttp"
+	"github.com/linxlib/fw/cmd/example/controllers"
+	"github.com/linxlib/fw/cmd/example/middlewares"
+	"github.com/linxlib/fw/cmd/example/services"
 )
 
-type AuthorizationMiddleware struct{}
+//go:generate go run github.com/linxlib/fw/astp/cmd/astp -exported .
 
-func (AuthorizationMiddleware) Spec() middleware.AnnotationSpec {
-	return middleware.AnnotationSpec{Name: "Authorization", Scope: middleware.ScopeBoth, Stage: middleware.StageBefore}
-}
-
-func (AuthorizationMiddleware) Before(ctx ctxpkg.Context, args middleware.AnnotationArgs) error {
-	if len(args.Args) == 0 {
-		return nil
-	}
-	required := args.Args[0]
-	role := string(ctx.Raw().Request.Header.Peek("X-Role"))
-	if role != required {
-		_ = ctx.Respond(fasthttp.StatusForbidden, 40300, "forbidden", map[string]any{"required_role": required})
-		return fmt.Errorf("unauthorized")
-	}
-	return nil
-}
-
-func (AuthorizationMiddleware) After(ctx ctxpkg.Context, args middleware.AnnotationArgs) error {
-	return nil
-}
-
-type LogMiddleware struct{}
-
-func (LogMiddleware) Spec() middleware.AnnotationSpec {
-	return middleware.AnnotationSpec{Name: "Log", Scope: middleware.ScopeBoth, Stage: middleware.StageBoth}
-}
-
-func (LogMiddleware) Before(ctx ctxpkg.Context, args middleware.AnnotationArgs) error {
-	ctx.Raw().Response.Header.Set("X-Log-Before", "1")
-	return nil
-}
-
-func (LogMiddleware) After(ctx ctxpkg.Context, args middleware.AnnotationArgs) error {
-	ctx.Raw().Response.Header.Set("X-Log-After", "1")
-	return nil
-}
-
-type UserQuery struct {
-	Name string `required:"true"` //name
-	Age  int    //年龄
-}
-
-// UserController 用户
-// @Route /api/v1
-// @Authorization(Admin)
-type UserController struct{}
-
-// ModifyUser 修改用户
-// @POST /user
-// @POST /user_info
-// @Log(stage=before)
-func (c *UserController) ModifyUser(ctx ctxpkg.Context, query UserQuery) (int, error) {
-	return 1, ctx.Respond(fasthttp.StatusOK, 0, "ok", map[string]any{"name": query.Name, "age": query.Age})
-}
+//go:embed .astp.json
+var astpData []byte
 
 func main() {
-	e, err := app.New("")
+	e, err := app.New("config/app.yaml")
 	if err != nil {
 		panic(err)
 	}
-	e.RegisterMiddleware(AuthorizationMiddleware{})
-	e.RegisterMiddleware(LogMiddleware{})
-	e.RegisterController(&UserController{})
+	e.EmbedProject(astpData)
+
+	// Register a singleton into the global container.
+	// It can be injected into controller method parameters by type.
+	db := services.NewDemoDB("demo-main")
+	userService := services.NewUserService()
+	e.Container().Map(db)
+	e.Container().Map(userService)
+
+	e.RegisterMiddleware(middlewares.AuthorizationMiddleware{})
+	e.RegisterMiddleware(middlewares.LogMiddleware{})
+	e.RegisterMiddleware(middlewares.WebSocketMiddleware{})
+	e.RegisterMiddleware(middlewares.SSEMiddleware{})
+	e.RegisterController(&controllers.UserController{})
+	log.Println("starting server...")
 	if err := e.ListenAndServe(); err != nil {
 		panic(err)
 	}

@@ -1,0 +1,13 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+log:
+  level: info
+  output: console
+
+openapi:
+  enabled: true
+  output: openapi.json
+  title: "FW Example API"
+  version: "1.0.0"

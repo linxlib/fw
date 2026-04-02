@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -20,6 +21,7 @@ import (
 	"github.com/linxlib/fw/middleware"
 	"github.com/linxlib/fw/openapi"
 	"github.com/linxlib/fw/response"
+	"github.com/pterm/pterm"
 	"github.com/valyala/fasthttp"
 )
 
@@ -31,10 +33,11 @@ type Engine struct {
 	responseManager *response.Manager
 	project         *astp.Project
 
-	controllers map[string]reflect.Value
-	middlewares map[string]middleware.Middleware
-	globalUse   []middleware.Bound
-	routes      []routeDef
+	controllers  map[string]reflect.Value
+	middlewares  map[string]middleware.Middleware
+	globalUse    []middleware.Bound
+	routes       []routeDef
+	embeddedASTP []byte // pre-generated AST metadata (JSON), set via EmbedProject()
 }
 
 type routeDef struct {
@@ -50,13 +53,11 @@ type routeDef struct {
 	OpenAPIArgs       []openapi.Parameter
 	OpenAPIBody       *openapi.RequestBody
 	OpenAPIRespSchema *openapi.Schema
+	OpenAPISecurity   []openapi.SecurityRequirement
 	AstMethod         *astp.Func
-	BeforeGlobal      []middleware.Bound
-	BeforeCtrl        []middleware.Bound
-	BeforeMethod      []middleware.Bound
-	AfterMethod       []middleware.Bound
-	AfterCtrl         []middleware.Bound
-	AfterGlobal       []middleware.Bound
+	GlobalMW          []middleware.Bound
+	CtrlMW            []middleware.Bound
+	MethodMW          []middleware.Bound
 }
 
 func New(configPath string) (*Engine, error) {
@@ -108,12 +109,67 @@ func (e *Engine) RegisterController(controller any) {
 	if !v.IsValid() {
 		return
 	}
+	e.autoInjectControllerFields(v)
 	t := v.Type()
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 	e.controllers[t.Name()] = v
 	_ = e.globalContainer.Apply(controller)
+}
+
+func (e *Engine) autoInjectControllerFields(v reflect.Value) {
+	if !v.IsValid() {
+		return
+	}
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return
+	}
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		if !field.CanSet() || !field.IsZero() {
+			continue
+		}
+
+		mapped := e.globalContainer.Get(field.Type())
+		if !mapped.IsValid() {
+			continue
+		}
+
+		if mapped.Type().AssignableTo(field.Type()) {
+			field.Set(mapped)
+			continue
+		}
+		if mapped.Type().ConvertibleTo(field.Type()) {
+			field.Set(mapped.Convert(field.Type()))
+			continue
+		}
+	}
+}
+
+// EmbedProject sets pre-generated AST metadata (the contents of .astp.json).
+// When set, Build() uses this data instead of parsing Go source files at runtime.
+//
+// Typical usage with go:generate + go:embed:
+//
+//	//go:generate go run github.com/linxlib/fw/astp/cmd/astp -exported .
+//	//go:embed .astp.json
+//	var astpData []byte
+//
+//	func main() {
+//	    e, _ := app.New("")
+//	    e.EmbedProject(astpData)
+//	    // ...
+//	}
+func (e *Engine) EmbedProject(data []byte) {
+	e.embeddedASTP = data
 }
 
 func (e *Engine) Build() error {
@@ -129,20 +185,23 @@ func (e *Engine) Build() error {
 	e.printRoutes()
 	if e.cfg.OpenAPI.Enabled {
 		opi := make([]openapi.RouteInfo, 0, len(e.routes))
+		secSchemes := make(map[string]openapi.SecurityScheme)
 		for _, rt := range e.routes {
 			opi = append(opi, openapi.RouteInfo{
 				Method:               rt.Method,
 				Path:                 rt.Path,
-				OperationID:          rt.Controller + "_" + rt.Handler,
+				OperationID:          operationIDForRoute(rt),
 				OperationDescription: rt.HandlerDesc,
 				TagName:              rt.Controller,
 				TagDescription:       rt.ControllerDesc,
 				Parameters:           rt.OpenAPIArgs,
 				RequestBody:          rt.OpenAPIBody,
 				ResponseSchema:       rt.OpenAPIRespSchema,
+				Security:             rt.OpenAPISecurity,
 			})
+			collectSecuritySchemes(secSchemes, rt.GlobalMW, rt.CtrlMW, rt.MethodMW)
 		}
-		if err := openapi.Generate(e.cfg.OpenAPI.Output, e.cfg.OpenAPI.Title, e.cfg.OpenAPI.Version, opi); err != nil {
+		if err := openapi.Generate(e.cfg.OpenAPI.Output, e.cfg.OpenAPI.Title, e.cfg.OpenAPI.Version, opi, secSchemes); err != nil {
 			return err
 		}
 		openapi.RegisterDocsRoutes(e.router, e.cfg.OpenAPI.Output)
@@ -157,10 +216,23 @@ func (e *Engine) ListenAndServe() error {
 	}
 	addr := net.JoinHostPort(e.cfg.Server.Host, fmt.Sprintf("%d", e.cfg.Server.Port))
 	e.log.Infof("server listening on %s", addr)
+	if e.cfg.OpenAPI.Enabled {
+		e.log.Infof("swagger ui: %s", e.swaggerDocsURL())
+	}
 	return fasthttp.ListenAndServe(addr, e.router.Handler)
 }
 
+func (e *Engine) swaggerDocsURL() string {
+	host := strings.TrimSpace(e.cfg.Server.Host)
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "localhost"
+	}
+	hostPort := net.JoinHostPort(host, fmt.Sprintf("%d", e.cfg.Server.Port))
+	return "http://" + hostPort + "/docs"
+}
+
 func (e *Engine) loadProject() error {
+	// 1. Resolve project directory and prefer live parsing when source code exists.
 	projectDir := e.cfg.ProjectDir
 	if projectDir == "" {
 		projectDir = "."
@@ -169,16 +241,69 @@ func (e *Engine) loadProject() error {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(abs); err != nil {
-		return fmt.Errorf("project dir not found: %w", err)
+	if ok, err := hasGoSources(abs); err == nil && ok {
+		p := astp.NewParser()
+		proj, err := p.ParseProject(abs)
+		if err != nil {
+			return err
+		}
+		e.project = proj
+		e.log.Infof("loaded project metadata via live parsing from %s", abs)
+		return nil
 	}
-	p := astp.NewParser()
-	proj, err := p.ParseProject(abs)
-	if err != nil {
-		return err
+
+	// 2. Try to load pre-generated .astp.json from project dir.
+	astpFile := filepath.Join(abs, astp.DefaultOutputFile)
+	if _, err := os.Stat(astpFile); err == nil {
+		proj, err := astp.Load(astpFile)
+		if err != nil {
+			return fmt.Errorf("load %s: %w", astpFile, err)
+		}
+		e.project = proj
+		e.log.Infof("loaded project metadata from %s", astpFile)
+		return nil
 	}
-	e.project = proj
-	return nil
+
+	// 3. Fall back to embedded AST data (deployment mode — no source required).
+	if len(e.embeddedASTP) > 0 {
+		proj, err := astp.LoadFromBytes(e.embeddedASTP)
+		if err != nil {
+			return fmt.Errorf("load embedded astp data: %w", err)
+		}
+		e.project = proj
+		e.log.Infof("loaded project metadata from embedded data")
+		return nil
+	}
+
+	return fmt.Errorf("no Go source files in %s, and neither %s nor embedded metadata is available", abs, astp.DefaultOutputFile)
+}
+
+func hasGoSources(root string) (bool, error) {
+	if _, err := os.Stat(root); err != nil {
+		return false, err
+	}
+	found := false
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if name == ".git" || name == "vendor" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(strings.ToLower(d.Name()), ".go") {
+			found = true
+			return fs.SkipAll
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, fs.SkipAll) {
+		return false, err
+	}
+	return found, nil
 }
 
 func (e *Engine) collectRoutes() error {
@@ -213,7 +338,9 @@ func (e *Engine) collectRoutes() error {
 				methodDesc := entityDescription(m.Name, m.Doc)
 				respSchema := responseSchemaForMethod(q, m)
 				methodMW := e.matchMiddleware(m.Doc, middleware.ScopeMethod)
-				ctrlResolved, methodResolved := resolveScopedMiddleware(ctrlMW, methodMW)
+				ignoreSet := parseIgnoreList(m.Doc)
+				ctrlResolved, methodResolved := resolveScopedMiddleware(ctrlMW, methodMW, ignoreSet)
+				globalResolved := filterIgnored(e.globalUse, ignoreSet)
 				seen := make(map[string]struct{})
 				for _, rt := range routes {
 					fullPath := joinPath(basePath, rt.Path)
@@ -229,9 +356,6 @@ func (e *Engine) collectRoutes() error {
 						return fmt.Errorf("duplicate route annotation in method %s.%s: %s", typ.Name, m.Name, key)
 					}
 					seen[key] = struct{}{}
-					beforeCtrl, afterCtrl := splitStage(ctrlResolved)
-					beforeMethod, afterMethod := splitStage(methodResolved)
-					beforeGlobal, afterGlobal := splitStage(e.globalUse)
 					e.routes = append(e.routes, routeDef{
 						Method:            rt.Method,
 						Path:              fullPath,
@@ -245,13 +369,11 @@ func (e *Engine) collectRoutes() error {
 						OpenAPIArgs:       opArgs,
 						OpenAPIBody:       opBody,
 						OpenAPIRespSchema: respSchema,
+						OpenAPISecurity:   collectSecurityRequirements(globalResolved, ctrlResolved, methodResolved),
 						AstMethod:         m,
-						BeforeGlobal:      beforeGlobal,
-						AfterGlobal:       afterGlobal,
-						BeforeCtrl:        beforeCtrl,
-						AfterCtrl:         afterCtrl,
-						BeforeMethod:      beforeMethod,
-						AfterMethod:       afterMethod,
+						GlobalMW:          globalResolved,
+						CtrlMW:            ctrlResolved,
+						MethodMW:          methodResolved,
 					})
 				}
 			}
@@ -296,7 +418,7 @@ func (e *Engine) registerRoutes() error {
 					return ctx.Respond(fasthttp.StatusOK, 0, "ok", nil)
 				}
 				return nil
-			}, rtCopy.BeforeGlobal, rtCopy.BeforeCtrl, rtCopy.BeforeMethod, rtCopy.AfterMethod, rtCopy.AfterCtrl, rtCopy.AfterGlobal)
+			}, rtCopy.GlobalMW, rtCopy.CtrlMW, rtCopy.MethodMW)
 			if err := h(c); err != nil {
 				e.log.Errorf("handler failed: %v", err)
 				if raw.Response.StatusCode() == 0 {
@@ -319,12 +441,29 @@ func (e *Engine) printRoutes() {
 	}
 	sort.Strings(methods)
 	for _, method := range methods {
-		e.log.Infof("%s", method)
+		e.log.Infof("%s", colorizeHTTPMethod(method))
 		paths := tree[method]
 		sort.Strings(paths)
 		for _, path := range paths {
 			e.log.Infof("  |- %s", path)
 		}
+	}
+}
+
+func colorizeHTTPMethod(method string) string {
+	switch method {
+	case fasthttp.MethodGet:
+		return pterm.FgGreen.Sprintf("%s", method)
+	case fasthttp.MethodPost:
+		return pterm.FgLightCyan.Sprintf("%s", method)
+	case fasthttp.MethodPut:
+		return pterm.FgYellow.Sprintf("%s", method)
+	case fasthttp.MethodDelete:
+		return pterm.FgRed.Sprintf("%s", method)
+	case fasthttp.MethodPatch:
+		return pterm.FgLightYellow.Sprintf("%s", method)
+	default:
+		return method
 	}
 }
 
@@ -385,6 +524,43 @@ func pathParamNames(path string) []string {
 		if strings.HasPrefix(part, ":") && len(part) > 1 {
 			out = append(out, part[1:])
 		}
+	}
+	return out
+}
+
+func operationIDForRoute(rt routeDef) string {
+	path := strings.Trim(rt.Path, "/")
+	if path == "" {
+		path = "root"
+	}
+	return sanitizeOperationIDPart(rt.Controller) + "_" +
+		sanitizeOperationIDPart(rt.Handler) + "_" +
+		strings.ToLower(rt.Method) + "_" +
+		sanitizeOperationIDPart(path)
+}
+
+func sanitizeOperationIDPart(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "x"
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	lastUnderscore := false
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastUnderscore = false
+			continue
+		}
+		if !lastUnderscore {
+			b.WriteByte('_')
+			lastUnderscore = true
+		}
+	}
+	out := strings.Trim(b.String(), "_")
+	if out == "" {
+		return "x"
 	}
 	return out
 }
