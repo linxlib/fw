@@ -1,0 +1,69 @@
+<!-- HTML for static distribution bundle build -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Swagger UI</title>
+    <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
+    <style>
+      html {
+        box-sizing: border-box;
+        overflow: -moz-scrollbars-vertical;
+        overflow-y: scroll;
+      }
+
+      *,
+      *:before,
+      *:after {
+        box-sizing: inherit;
+      }
+
+      body {
+        margin: 0;
+        background: #fafafa;
+      }
+    </style>
+    <link rel="icon" type="image/png" href="//fastapi.tiangolo.com/img/favicon.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="//fastapi.tiangolo.com/img/favicon.png" sizes="16x16" />
+  </head>
+
+  <body>
+    <div id="swagger-ui"></div>
+    <script>
+      window.onload = function() {
+        //<editor-fold desc="Changeable Configuration Block">
+        console.log('swagger ui v5.18.2')
+        // the following lines will be replaced by docker/configurator, when it runs in a docker-container
+        window.ui = SwaggerUIBundle({
+          // url: "/openapi.json",
+          configUrl: "/docs/config",
+          dom_id: '#swagger-ui',
+          deepLinking: true,
+          docExpansion: 'none',
+          queryConfigEnabled: true,
+          presets: [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIStandalonePreset
+          ],
+          plugins: [
+            SwaggerUIBundle.plugins.DownloadUrl,
+            SwaggerUIBundle.plugins.Topbar
+          ],
+          layout: "StandaloneLayout",
+          syntaxHighlight: {
+            activated: true,
+            theme: 'monokai'
+          },
+          validatorUrl: 'none',
+          tryItOutEnabled: true,
+          displayRequestDuration: true
+        });
+
+        //</editor-fold>
+      };
+    </script>
+    <script src="//cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js" charset="UTF-8"> </script>
+    <script src="//cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js" charset="UTF-8"> </script>
+
+  </body>
+</html>

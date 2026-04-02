@@ -1,0 +1,249 @@
+{
+  "packages": {
+    "astp/testdata": {
+      "name": "testdata",
+      "path": "astp/testdata",
+      "types": {
+        "Reader": {
+          "name": "Reader",
+          "pkg_path": "astp/testdata",
+          "kind": "interface",
+          "methods": [
+            {
+              "name": "Read",
+              "pkg_path": "astp/testdata",
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "error",
+                    "kind": "basic"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "Service": {
+          "name": "Service",
+          "pkg_path": "astp/testdata",
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "Name",
+              "type": {
+                "name": "string",
+                "kind": "basic"
+              },
+              "tag": {
+                "json": "name"
+              },
+              "embedded": false
+            }
+          ],
+          "methods": [
+            {
+              "name": "GetUsers",
+              "pkg_path": "astp/testdata",
+              "recv": {
+                "name": "Service",
+                "kind": "pointer"
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "kind": "slice",
+                    "elem_type": {
+                      "name": "User",
+                      "kind": "struct"
+                    }
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "@GET"
+                  },
+                  {
+                    "text": "@Path(\"/users\")"
+                  }
+                ],
+                "annotations": [
+                  "GET",
+                  "Path"
+                ]
+              }
+            },
+            {
+              "name": "CreateUser",
+              "pkg_path": "astp/testdata",
+              "recv": {
+                "name": "Service",
+                "kind": "pointer"
+              },
+              "params": [
+                {
+                  "name": "u",
+                  "type": {
+                    "name": "User",
+                    "kind": "pointer"
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "error",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "@POST"
+                  },
+                  {
+                    "text": "@Path(\"/users\")"
+                  }
+                ],
+                "annotations": [
+                  "POST",
+                  "Path"
+                ]
+              }
+            }
+          ],
+          "doc": {
+            "list": [
+              {
+                "text": "@Service"
+              },
+              {
+                "text": "@Path(\"/api\")"
+              }
+            ],
+            "annotations": [
+              "Service",
+              "Path"
+            ]
+          }
+        },
+        "User": {
+          "name": "User",
+          "pkg_path": "astp/testdata",
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "Name",
+              "type": {
+                "name": "string",
+                "kind": "basic"
+              },
+              "tag": {
+                "db": "user_name",
+                "json": "name"
+              },
+              "embedded": false
+            },
+            {
+              "name": "Age",
+              "type": {
+                "name": "int",
+                "kind": "basic"
+              },
+              "tag": {
+                "json": "age"
+              },
+              "embedded": false
+            }
+          ],
+          "methods": [
+            {
+              "name": "GetName",
+              "pkg_path": "astp/testdata",
+              "recv": {
+                "name": "User",
+                "kind": "pointer"
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "string",
+                    "kind": "basic"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Copy",
+              "pkg_path": "astp/testdata",
+              "recv": {
+                "name": "User",
+                "kind": "pointer"
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "User",
+                    "kind": "pointer"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "functions": {
+        "CreateUser": {
+          "name": "CreateUser",
+          "pkg_path": "astp/testdata",
+          "params": [
+            {
+              "name": "name",
+              "type": {
+                "name": "string",
+                "kind": "basic"
+              }
+            },
+            {
+              "name": "age",
+              "type": {
+                "name": "int",
+                "kind": "basic"
+              }
+            }
+          ],
+          "results": [
+            {
+              "name": "",
+              "type": {
+                "name": "User",
+                "kind": "pointer"
+              }
+            }
+          ]
+        }
+      },
+      "variables": {
+        "DefaultUser": {
+          "name": "DefaultUser",
+          "pkg_path": "astp/testdata",
+          "type": null
+        }
+      },
+      "constants": {
+        "Version": {
+          "name": "Version",
+          "pkg_path": "astp/testdata",
+          "value": "\"1.0.0\""
+        }
+      }
+    }
+  }
+}
