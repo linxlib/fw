@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/fasthttp/websocket"
-	ctxpkg "github.com/linxlib/fw/context"
-	"github.com/linxlib/fw/middleware"
+	ctxpkg "github.com/linxlib/fw/v2/context"
+	"github.com/linxlib/fw/v2/middleware"
 	"github.com/valyala/fasthttp"
 )
 
@@ -14,6 +14,7 @@ const (
 	WSKeyReply = "WS.Reply"
 )
 
+// @Middleware
 type WebSocketMiddleware struct{}
 
 func (WebSocketMiddleware) Spec() middleware.AnnotationSpec {

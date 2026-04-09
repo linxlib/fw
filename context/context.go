@@ -6,15 +6,25 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/linxlib/fw/inject"
-	"github.com/linxlib/fw/response"
+	"github.com/linxlib/fw/v2/inject"
+	"github.com/linxlib/fw/v2/response"
 	"github.com/valyala/fasthttp"
 )
 
 type Context interface {
 	Raw() *fasthttp.RequestCtx
+	Method() string
+	Scheme() string
+	Host() string
+	Path() string
+	URI() string
+	Header(name string) string
+	Headers() map[string]string
 	Param(name string) string
+	Params() map[string]string
 	Query(name string) string
+	Queries() map[string]string
+	Body() []byte
 	BindJSON(out any) error
 	Respond(statusCode int, code int, message string, data any) error
 	Container() inject.Injector
@@ -58,8 +68,18 @@ func New(raw *fasthttp.RequestCtx, resp *response.Manager) *FWContext {
 }
 
 func (c *FWContext) Raw() *fasthttp.RequestCtx                           { return c.raw }
+func (c *FWContext) Method() string                                      { return string(c.raw.Method()) }
+func (c *FWContext) Scheme() string                                      { return string(c.raw.URI().Scheme()) }
+func (c *FWContext) Host() string                                        { return string(c.raw.Host()) }
+func (c *FWContext) Path() string                                        { return string(c.raw.Path()) }
+func (c *FWContext) URI() string                                         { return string(c.raw.RequestURI()) }
+func (c *FWContext) Header(name string) string                           { return string(c.raw.Request.Header.Peek(name)) }
 func (c *FWContext) Param(name string) string                            { return c.params[name] }
+func (c *FWContext) Params() map[string]string                           { return cloneStringMap(c.params) }
 func (c *FWContext) Query(name string) string                            { return string(c.raw.QueryArgs().Peek(name)) }
+func (c *FWContext) Queries() map[string]string                          { return collectArgs(c.raw.QueryArgs()) }
+func (c *FWContext) Headers() map[string]string                          { return collectHeaders(&c.raw.Request.Header) }
+func (c *FWContext) Body() []byte                                        { return append([]byte(nil), c.raw.PostBody()...) }
 func (c *FWContext) Container() inject.Injector                          { return c.container }
 func (c *FWContext) SetContainer(i inject.Injector)                      { c.container = i }
 func (c *FWContext) SetRouteParams(p map[string]string)                  { c.params = p }
@@ -142,6 +162,33 @@ func (c *FWContext) SSE(fn func(w *SSEWriter)) error {
 		fn(sw)
 	})
 	return nil
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	if len(src) == 0 {
+		return map[string]string{}
+	}
+	dst := make(map[string]string, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func collectArgs(args *fasthttp.Args) map[string]string {
+	result := make(map[string]string)
+	args.VisitAll(func(key, value []byte) {
+		result[string(key)] = string(value)
+	})
+	return result
+}
+
+func collectHeaders(header *fasthttp.RequestHeader) map[string]string {
+	result := make(map[string]string)
+	header.VisitAll(func(key, value []byte) {
+		result[string(key)] = string(value)
+	})
+	return result
 }
 
 // SSEWriter writes Server-Sent Events to an underlying buffered writer.

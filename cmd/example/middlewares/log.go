@@ -1,10 +1,12 @@
 package middlewares
 
 import (
-	ctxpkg "github.com/linxlib/fw/context"
-	"github.com/linxlib/fw/middleware"
+	ctxpkg "github.com/linxlib/fw/v2/context"
+	"github.com/linxlib/fw/v2/middleware"
 )
 
+// @Middleware
+// @Global
 type LogMiddleware struct{}
 
 func (LogMiddleware) Spec() middleware.AnnotationSpec {

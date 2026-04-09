@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/linxlib/fw/cmd/example/middlewares"
-	"github.com/linxlib/fw/cmd/example/models"
-	"github.com/linxlib/fw/cmd/example/services"
-	ctxpkg "github.com/linxlib/fw/context"
+	"github.com/linxlib/fw/v2/cmd/example/middlewares"
+	"github.com/linxlib/fw/v2/cmd/example/models"
+	"github.com/linxlib/fw/v2/cmd/example/services"
+	ctxpkg "github.com/linxlib/fw/v2/context"
 	"github.com/valyala/fasthttp"
 )
 
 // UserController 用户
+// @Controller
 // @Route /api/v1
 // @Authorization(Admin)
 type UserController struct {
@@ -36,7 +37,7 @@ func (c *UserController) ModifyUser(ctx ctxpkg.Context, query models.UserQuery, 
 
 // HealthCheck 健康检查（无需鉴权）
 // @GET /health
-// @Ignore(Authorization)
+// @Ignore(Authorization,Global)
 func (c *UserController) HealthCheck(ctx ctxpkg.Context) error {
 	return ctx.Respond(fasthttp.StatusOK, 0, "healthy", nil)
 }

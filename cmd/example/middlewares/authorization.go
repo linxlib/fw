@@ -3,8 +3,9 @@ package middlewares
 import (
 	"fmt"
 
-	ctxpkg "github.com/linxlib/fw/context"
-	"github.com/linxlib/fw/middleware"
+	"github.com/linxlib/fw/v2/config"
+	ctxpkg "github.com/linxlib/fw/v2/context"
+	"github.com/linxlib/fw/v2/middleware"
 	"github.com/valyala/fasthttp"
 )
 
@@ -13,7 +14,11 @@ const (
 	AuthorizationKeyUserRole = "Authorization.UserRole"
 )
 
-type AuthorizationMiddleware struct{}
+// @Middleware
+// @Global
+type AuthorizationMiddleware struct {
+	Config *config.Section `inject:""`
+}
 
 func (AuthorizationMiddleware) Spec() middleware.AnnotationSpec {
 	return middleware.AnnotationSpec{Name: "Authorization", Scope: middleware.ScopeBoth, Stage: middleware.StageBefore}
@@ -29,11 +34,21 @@ func (AuthorizationMiddleware) SecurityScheme() middleware.SecurityScheme {
 	}
 }
 
-func (AuthorizationMiddleware) Handle(ctx ctxpkg.Context, _ middleware.AnnotationArgs, next middleware.Handler) error {
+func (am *AuthorizationMiddleware) Handle(ctx ctxpkg.Context, _ middleware.AnnotationArgs, next middleware.Handler) error {
+	expectedAPIKey := am.Config.Get("api-key")
+	if expectedAPIKey == "" {
+		_ = ctx.Respond(fasthttp.StatusUnauthorized, 40100, "authorization middleware api-key is not configured", nil)
+		return fmt.Errorf("unauthorized: authorization middleware api-key is not configured")
+	}
+
 	apiKey := string(ctx.Raw().Request.Header.Peek("x-api-key"))
 	if apiKey == "" {
 		_ = ctx.Respond(fasthttp.StatusUnauthorized, 40100, "missing x-api-key header", nil)
 		return fmt.Errorf("unauthorized: missing x-api-key")
+	}
+	if apiKey != expectedAPIKey {
+		_ = ctx.Respond(fasthttp.StatusUnauthorized, 40100, "invalid x-api-key", nil)
+		return fmt.Errorf("unauthorized: invalid x-api-key")
 	}
 
 	ctx.Set(AuthorizationKeyUserID, 1001)

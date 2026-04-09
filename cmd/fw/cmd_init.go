@@ -6,24 +6,121 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
 
-func runInit(args []string) error {
-	name := "myapp"
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		name = args[0]
+type initTemplateData struct {
+	Name   string
+	Module string
+}
+
+type scaffoldTemplate struct {
+	target string
+	source string
+}
+
+var scaffoldTemplates = []scaffoldTemplate{
+	{target: "main.go", source: "templates/main.go.tmpl"},
+	{target: "controllers/hello_world_controller.go", source: "templates/controllers/hello_world_controller.go.tmpl"},
+	{target: "services/hello_service.go", source: "templates/services/hello_service.go.tmpl"},
+	{target: "middlewares/log.go", source: "templates/middlewares/log.go.tmpl"},
+	{target: "models/hello.go", source: "templates/models/hello.go.tmpl"},
+	{target: "config/app.yaml", source: "templates/config/app.yaml.tmpl"},
+	{target: ".gitignore", source: "templates/gitignore.tmpl"},
+}
+
+func newInitCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "init [project-name]",
+		Short: "Create a new FW project with standard directory layout",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts, err := resolveInitOptions(args)
+			if err != nil {
+				return fmt.Errorf("fw init: %w", err)
+			}
+
+			if err := runInit(opts); err != nil {
+				return fmt.Errorf("fw init: %w", err)
+			}
+			return nil
+		},
 	}
 
-	root, err := filepath.Abs(name)
+	return cmd
+}
+
+type initOptions struct {
+	projectName string
+	moduleName  string
+	root        string
+	createdDir  bool
+}
+
+func resolveInitOptions(args []string) (initOptions, error) {
+	if len(args) == 1 {
+		name := strings.TrimSpace(args[0])
+		if name == "" {
+			return initOptions{}, fmt.Errorf("project name cannot be empty")
+		}
+
+		root, err := filepath.Abs(name)
+		if err != nil {
+			return initOptions{}, err
+		}
+
+		return initOptions{
+			projectName: name,
+			moduleName:  name,
+			root:        root,
+			createdDir:  true,
+		}, nil
+	}
+
+	root, err := filepath.Abs(".")
 	if err != nil {
-		return err
+		return initOptions{}, err
 	}
 
-	if _, err := os.Stat(root); err == nil {
-		return fmt.Errorf("directory %q already exists", root)
+	name := filepath.Base(root)
+	if name == "." || name == string(filepath.Separator) {
+		return initOptions{}, fmt.Errorf("cannot derive project name from current directory")
 	}
 
-	fmt.Printf("Creating project %s ...\n", name)
+	return initOptions{
+		projectName: name,
+		moduleName:  name,
+		root:        root,
+		createdDir:  false,
+	}, nil
+}
+
+func runInit(opts initOptions) error {
+	root := opts.root
+	if opts.createdDir {
+		if _, err := os.Stat(root); err == nil {
+			return fmt.Errorf("directory %q already exists", root)
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+
+		if err := os.MkdirAll(root, 0755); err != nil {
+			return fmt.Errorf("create project directory: %w", err)
+		}
+	} else {
+		if err := ensureDirectoryBasicallyEmpty(root); err != nil {
+			return err
+		}
+	}
+
+	if opts.createdDir {
+		fmt.Printf("Creating project %s ...\n", opts.projectName)
+	} else {
+		fmt.Printf("Initializing project in current directory ...\n")
+	}
+
+	data := initTemplateData{Name: opts.projectName, Module: opts.moduleName}
 
 	// Create directory structure
 	dirs := []string{
@@ -39,26 +136,21 @@ func runInit(args []string) error {
 		}
 	}
 
-	// Write files
-	files := map[string]string{
-		"main.go":                               tplMain(name),
-		"controllers/hello_world_controller.go": tplHelloWorldController(name),
-		"services/hello_service.go":             tplHelloService(),
-		"middlewares/log.go":                    tplLogMiddleware(),
-		"models/hello.go":                       tplHelloModel(),
-		"config/app.yaml":                       tplConfig(name),
-		".gitignore":                            tplGitignore(),
-	}
-	for rel, content := range files {
-		p := filepath.Join(root, rel)
-		if err := os.WriteFile(p, []byte(content), 0644); err != nil {
-			return fmt.Errorf("write %s: %w", rel, err)
+	for _, item := range scaffoldTemplates {
+		content, err := renderTemplate(item.source, data)
+		if err != nil {
+			return fmt.Errorf("render %s: %w", item.target, err)
+		}
+
+		p := filepath.Join(root, item.target)
+		if err := writeNewFile(p, content); err != nil {
+			return fmt.Errorf("write %s: %w", item.target, err)
 		}
 	}
 
 	// Run go mod init
 	fmt.Printf("Initializing Go module ...\n")
-	cmd := exec.Command("go", "mod", "init", name)
+	cmd := exec.Command("go", "mod", "init", opts.moduleName)
 	cmd.Dir = root
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -78,214 +170,22 @@ func runInit(args []string) error {
 
 	fmt.Printf("\nProject created at %s\n\n", root)
 	fmt.Printf("Next steps:\n")
-	fmt.Printf("  cd %s\n", name)
+	if opts.createdDir {
+		fmt.Printf("  cd %s\n", opts.projectName)
+	}
 	fmt.Printf("  fw build              # run pre-build, build and post-build\n")
 	fmt.Printf("  go run .              # run in development mode\n")
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// Templates
-// ---------------------------------------------------------------------------
-
-func tplMain(name string) string {
-	return `package main
-
-import (
-	_ "embed"
-	"log"
-
-	"github.com/linxlib/fw/app"
-
-	"` + name + `/controllers"
-	"` + name + `/middlewares"
-)
-
-//go:generate go run github.com/linxlib/fw/astp/cmd/astp -exported .
-
-//go:embed .astp.json
-var astpData []byte
-
-func main() {
-	e, err := app.New("config/app.yaml")
+func ensureDirectoryBasicallyEmpty(path string) error {
+	entries, err := os.ReadDir(path)
 	if err != nil {
-		panic(err)
+		return err
+	}
+	if len(entries) == 0 {
+		return nil
 	}
 
-	e.EmbedProject(astpData)
-
-	// Register middlewares
-	e.RegisterMiddleware(middlewares.LogMiddleware{})
-
-	// Register controllers
-	e.RegisterController(&controllers.HelloWorldController{})
-
-	log.Println("starting server ...")
-	if err := e.ListenAndServe(); err != nil {
-		panic(err)
-	}
-}
-`
-}
-
-func tplHelloWorldController(name string) string {
-	return `package controllers
-
-import (
-	"github.com/linxlib/fw/context"
-	"github.com/valyala/fasthttp"
-
-	"` + name + `/services"
-)
-
-// HelloWorldController Hello World demo controller.
-// @Route /api
-// @Log
-type HelloWorldController struct {
-	Service *services.HelloService
-}
-
-// HelloWorld Hello World
-// @GET /hello
-func (c *HelloWorldController) HelloWorld(ctx context.Context) error {
-	if c.Service == nil {
-		c.Service = services.NewHelloService()
-	}
-
-	return ctx.Respond(fasthttp.StatusOK, 0, "ok", map[string]any{
-		"message": c.Service.Message(),
-		"time":    c.Service.NowRFC3339(),
-	})
-}
-
-// Greeting Greet a user by name
-// @GET /hello/:name
-func (c *HelloWorldController) Greeting(ctx context.Context) error {
-	if c.Service == nil {
-		c.Service = services.NewHelloService()
-	}
-
-	name := ctx.Param("name")
-	return ctx.Respond(fasthttp.StatusOK, 0, "ok", map[string]any{
-		"message": c.Service.Greeting(name),
-	})
-}
-`
-}
-
-func tplHelloService() string {
-	return `package services
-
-import "time"
-
-// HelloService is demo business logic.
-type HelloService struct{}
-
-func NewHelloService() *HelloService {
-	return &HelloService{}
-}
-
-func (s *HelloService) Message() string {
-	return "Hello, World!"
-}
-
-func (s *HelloService) Greeting(name string) string {
-	if name == "" {
-		return s.Message()
-	}
-	return "Hello, " + name + "!"
-}
-
-func (s *HelloService) NowRFC3339() string {
-	return time.Now().Format(time.RFC3339)
-}
-`
-}
-
-func tplLogMiddleware() string {
-	return `package middlewares
-
-import (
-	"log"
-	"time"
-
-	"github.com/linxlib/fw/context"
-	"github.com/linxlib/fw/middleware"
-)
-
-// LogMiddleware logs request method, path and duration.
-type LogMiddleware struct{}
-
-func (LogMiddleware) Spec() middleware.AnnotationSpec {
-	return middleware.AnnotationSpec{
-		Name:  "Log",
-		Scope: middleware.ScopeBoth,
-		Stage: middleware.StageBoth,
-	}
-}
-
-func (LogMiddleware) Handle(ctx context.Context, _ middleware.AnnotationArgs, next middleware.Handler) error {
-	start := time.Now()
-	raw := ctx.Raw()
-	log.Printf("--> %s %s", string(raw.Method()), string(raw.RequestURI()))
-
-	err := next(ctx)
-
-	status := raw.Response.StatusCode()
-	log.Printf("<-- %s %s %d %s", string(raw.Method()), string(raw.RequestURI()), status, time.Since(start))
-	return err
-}
-`
-}
-
-func tplHelloModel() string {
-	return `package models
-
-// HelloResponse is an example response model.
-type HelloResponse struct {
-	Message string ` + "`json:\"message\"`" + `
-	Time    string ` + "`json:\"time\"`" + `
-}
-`
-}
-
-func tplConfig(name string) string {
-	return `# ` + name + ` configuration
-server:
-  host: "0.0.0.0"
-  port: 8080
-
-log:
-  level: info
-  output: console
-
-openapi:
-  enabled: true
-  output: openapi.json
-  title: "` + name + ` API"
-  version: "1.0.0"
-`
-}
-
-func tplGitignore() string {
-	return `# Build output
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# AST metadata (generated)
-.astp.json
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-`
+	return fmt.Errorf("current directory must be basically empty to run init")
 }

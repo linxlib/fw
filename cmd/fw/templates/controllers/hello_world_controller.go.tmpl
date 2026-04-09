@@ -1,0 +1,42 @@
+package controllers
+
+import (
+	"github.com/linxlib/fw/v2/context"
+	"github.com/valyala/fasthttp"
+
+	"{{ .Module }}/services"
+)
+
+// HelloWorldController Hello World demo controller.
+// @Controller
+// @Route /api
+// @Log
+type HelloWorldController struct {
+	Service *services.HelloService
+}
+
+// HelloWorld Hello World
+// @GET /hello
+func (c *HelloWorldController) HelloWorld(ctx context.Context) error {
+	if c.Service == nil {
+		c.Service = services.NewHelloService()
+	}
+
+	return ctx.Respond(fasthttp.StatusOK, 0, "ok", map[string]any{
+		"message": c.Service.Message(),
+		"time":    c.Service.NowRFC3339(),
+	})
+}
+
+// Greeting Greet a user by name
+// @GET /hello/:name
+func (c *HelloWorldController) Greeting(ctx context.Context) error {
+	if c.Service == nil {
+		c.Service = services.NewHelloService()
+	}
+
+	name := ctx.Param("name")
+	return ctx.Respond(fasthttp.StatusOK, 0, "ok", map[string]any{
+		"message": c.Service.Greeting(name),
+	})
+}

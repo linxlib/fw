@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/linxlib/fw/astp"
-	"github.com/linxlib/fw/openapi"
+	"github.com/linxlib/fw/v2/astp"
+	"github.com/linxlib/fw/v2/openapi"
 )
 
 type BindSource string

@@ -4,7 +4,7 @@ This document describes the current project architecture and conventions for fut
 
 ## Module
 
-- Module path: `github.com/linxlib/fw`
+- Module path: `github.com/linxlib/fw/v2`
 - Go version: `1.25`
 - Runtime stack:
   - `github.com/valyala/fasthttp`

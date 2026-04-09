@@ -1,10 +1,12 @@
 package app
 
 import (
-	"github.com/linxlib/fw/annotation"
-	"github.com/linxlib/fw/astp"
-	"github.com/linxlib/fw/middleware"
-	"github.com/linxlib/fw/openapi"
+	"strings"
+
+	"github.com/linxlib/fw/v2/annotation"
+	"github.com/linxlib/fw/v2/astp"
+	"github.com/linxlib/fw/v2/middleware"
+	"github.com/linxlib/fw/v2/openapi"
 )
 
 func (e *Engine) matchMiddleware(doc *astp.CommentGroup, scope middleware.Scope) []middleware.Bound {
@@ -56,14 +58,46 @@ func filterIgnored(list []middleware.Bound, ignore map[string]struct{}) []middle
 	if len(ignore) == 0 {
 		return list
 	}
+	if hasIgnored(ignore, "Global") {
+		return nil
+	}
 	var out []middleware.Bound
 	for _, item := range list {
-		if _, skip := ignore[item.MW.Spec().Name]; skip {
+		if hasIgnored(ignore, item.MW.Spec().Name) {
 			continue
 		}
 		out = append(out, item)
 	}
 	return out
+}
+
+func mergeIgnoreSets(items ...map[string]struct{}) map[string]struct{} {
+	out := make(map[string]struct{})
+	for _, item := range items {
+		for name := range item {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				continue
+			}
+			out[name] = struct{}{}
+		}
+	}
+	return out
+}
+
+func hasIgnored(ignore map[string]struct{}, name string) bool {
+	if len(ignore) == 0 {
+		return false
+	}
+	if _, ok := ignore[name]; ok {
+		return true
+	}
+	for key := range ignore {
+		if strings.EqualFold(key, name) {
+			return true
+		}
+	}
+	return false
 }
 
 func resolveScopedMiddleware(controllerLevel []middleware.Bound, methodLevel []middleware.Bound, ignore map[string]struct{}) ([]middleware.Bound, []middleware.Bound) {

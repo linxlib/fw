@@ -8,19 +8,21 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/fasthttp/router"
-	"github.com/linxlib/fw/annotation"
-	"github.com/linxlib/fw/astp"
-	"github.com/linxlib/fw/config"
-	ctxpkg "github.com/linxlib/fw/context"
-	"github.com/linxlib/fw/inject"
-	"github.com/linxlib/fw/logger"
-	"github.com/linxlib/fw/middleware"
-	"github.com/linxlib/fw/openapi"
-	"github.com/linxlib/fw/response"
+	"github.com/linxlib/fw/v2/annotation"
+	"github.com/linxlib/fw/v2/astp"
+	"github.com/linxlib/fw/v2/config"
+	ctxpkg "github.com/linxlib/fw/v2/context"
+	"github.com/linxlib/fw/v2/inject"
+	"github.com/linxlib/fw/v2/logger"
+	"github.com/linxlib/fw/v2/middleware"
+	"github.com/linxlib/fw/v2/openapi"
+	"github.com/linxlib/fw/v2/response"
 	"github.com/pterm/pterm"
 	"github.com/valyala/fasthttp"
 )
@@ -32,6 +34,7 @@ type Engine struct {
 	globalContainer inject.Injector
 	responseManager *response.Manager
 	project         *astp.Project
+	autoRegistered  bool
 
 	controllers  map[string]reflect.Value
 	middlewares  map[string]middleware.Middleware
@@ -96,6 +99,7 @@ func (e *Engine) RegisterMiddleware(mw middleware.Middleware) {
 	if spec.Name == "" {
 		return
 	}
+	e.injectMiddlewareDependencies(mw, spec.Name)
 	e.middlewares[spec.Name] = mw
 }
 
@@ -109,7 +113,7 @@ func (e *Engine) RegisterController(controller any) {
 	if !v.IsValid() {
 		return
 	}
-	e.autoInjectControllerFields(v)
+	e.autoInjectFields(v, e.globalContainer)
 	t := v.Type()
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -118,7 +122,7 @@ func (e *Engine) RegisterController(controller any) {
 	_ = e.globalContainer.Apply(controller)
 }
 
-func (e *Engine) autoInjectControllerFields(v reflect.Value) {
+func (e *Engine) autoInjectFields(v reflect.Value, container inject.Injector) {
 	if !v.IsValid() {
 		return
 	}
@@ -138,7 +142,7 @@ func (e *Engine) autoInjectControllerFields(v reflect.Value) {
 			continue
 		}
 
-		mapped := e.globalContainer.Get(field.Type())
+		mapped := container.Get(field.Type())
 		if !mapped.IsValid() {
 			continue
 		}
@@ -154,12 +158,32 @@ func (e *Engine) autoInjectControllerFields(v reflect.Value) {
 	}
 }
 
+func (e *Engine) injectMiddlewareDependencies(mw middleware.Middleware, name string) {
+	container := inject.New()
+	container.SetParent(e.globalContainer)
+	section := e.middlewareConfig(name)
+	container.Map(section)
+	e.autoInjectFields(reflect.ValueOf(mw), container)
+	_ = container.Apply(mw)
+}
+
+func (e *Engine) middlewareConfig(name string) *config.Section {
+	key := strings.ToLower(strings.TrimSpace(name))
+	section, ok := e.cfg.Middlewares[key]
+	if !ok {
+		empty := config.NewSection(nil)
+		return &empty
+	}
+	cpy := section
+	return &cpy
+}
+
 // EmbedProject sets pre-generated AST metadata (the contents of .astp.json).
 // When set, Build() uses this data instead of parsing Go source files at runtime.
 //
 // Typical usage with go:generate + go:embed:
 //
-//	//go:generate go run github.com/linxlib/fw/astp/cmd/astp -exported .
+//	//go:generate go run github.com/linxlib/fw/v2/astp/cmd/astp -exported .
 //	//go:embed .astp.json
 //	var astpData []byte
 //
@@ -176,12 +200,16 @@ func (e *Engine) Build() error {
 	if err := e.loadProject(); err != nil {
 		return err
 	}
+	if err := e.applyAutoRegistrars(); err != nil {
+		return err
+	}
 	if err := e.collectRoutes(); err != nil {
 		return err
 	}
 	if err := e.registerRoutes(); err != nil {
 		return err
 	}
+	e.printGlobalMiddlewares()
 	e.printRoutes()
 	if e.cfg.OpenAPI.Enabled {
 		opi := make([]openapi.RouteInfo, 0, len(e.routes))
@@ -338,7 +366,9 @@ func (e *Engine) collectRoutes() error {
 				methodDesc := entityDescription(m.Name, m.Doc)
 				respSchema := responseSchemaForMethod(q, m)
 				methodMW := e.matchMiddleware(m.Doc, middleware.ScopeMethod)
-				ignoreSet := parseIgnoreList(m.Doc)
+				ctrlIgnore := parseIgnoreList(typ.Doc)
+				methodIgnore := parseIgnoreList(m.Doc)
+				ignoreSet := mergeIgnoreSets(ctrlIgnore, methodIgnore)
 				ctrlResolved, methodResolved := resolveScopedMiddleware(ctrlMW, methodMW, ignoreSet)
 				globalResolved := filterIgnored(e.globalUse, ignoreSet)
 				seen := make(map[string]struct{})
@@ -392,6 +422,41 @@ func (e *Engine) registerRoutes() error {
 		seen[key] = struct{}{}
 		rtCopy := rt
 		e.router.Handle(rt.Method, rt.Path, func(raw *fasthttp.RequestCtx) {
+			start := time.Now()
+			if e.cfg.Log.RequestEnabled {
+				defer func() {
+					status := raw.Response.StatusCode()
+					if status == 0 {
+						status = fasthttp.StatusOK
+					}
+					e.log.Infof("%s %s -> %d (%s)", string(raw.Method()), string(raw.Path()), status, time.Since(start))
+				}()
+			}
+			if e.cfg.Recovery.Enabled {
+				defer func() {
+					recovered := recover()
+					if recovered == nil {
+						return
+					}
+
+					panicText, stackPayload, stackTree := buildRecoveryReport(recovered)
+					e.log.Errorf("panic recovered: %s", panicText)
+					e.log.Errorf("stack:")
+					for _, line := range stackTree {
+						e.log.Errorf("%s", line)
+					}
+
+					var data any
+					if e.cfg.Recovery.ReturnStackToBody {
+						data = map[string]any{
+							"panic": panicText,
+							"stack": stackPayload,
+						}
+					}
+					_ = ctxpkg.New(raw, e.responseManager).Respond(fasthttp.StatusInternalServerError, 50000, "internal error", data)
+				}()
+			}
+
 			c := ctxpkg.New(raw, e.responseManager)
 			params := make(map[string]string, len(rtCopy.ParamNames))
 			for _, name := range rtCopy.ParamNames {
@@ -431,9 +496,9 @@ func (e *Engine) registerRoutes() error {
 }
 
 func (e *Engine) printRoutes() {
-	tree := make(map[string][]string)
+	tree := make(map[string][]routeDef)
 	for _, rt := range e.routes {
-		tree[rt.Method] = append(tree[rt.Method], rt.Path)
+		tree[rt.Method] = append(tree[rt.Method], rt)
 	}
 	methods := make([]string, 0, len(tree))
 	for method := range tree {
@@ -442,12 +507,60 @@ func (e *Engine) printRoutes() {
 	sort.Strings(methods)
 	for _, method := range methods {
 		e.log.Infof("%s", colorizeHTTPMethod(method))
-		paths := tree[method]
-		sort.Strings(paths)
-		for _, path := range paths {
-			e.log.Infof("  |- %s", path)
+		routes := tree[method]
+		sort.Slice(routes, func(i, j int) bool {
+			if routes[i].Path == routes[j].Path {
+				return routes[i].Controller+"."+routes[i].Handler < routes[j].Controller+"."+routes[j].Handler
+			}
+			return routes[i].Path < routes[j].Path
+		})
+		for _, rt := range routes {
+			mwNames := routeMiddlewareNames(rt)
+			e.log.Infof("  |- %s [mw: %s]", rt.Path, strings.Join(mwNames, ", "))
 		}
 	}
+}
+
+func (e *Engine) printGlobalMiddlewares() {
+	names := make([]string, 0, len(e.globalUse))
+	seen := make(map[string]struct{})
+	for _, bound := range e.globalUse {
+		name := strings.TrimSpace(bound.MW.Spec().Name)
+		if name != "" {
+			if _, exists := seen[name]; exists {
+				continue
+			}
+			seen[name] = struct{}{}
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		e.log.Infof("global middlewares: (none)")
+		return
+	}
+	e.log.Infof("global middlewares: %s", strings.Join(names, ", "))
+}
+
+func routeMiddlewareNames(rt routeDef) []string {
+	names := make([]string, 0, len(rt.GlobalMW)+len(rt.CtrlMW)+len(rt.MethodMW))
+	seen := make(map[string]struct{})
+	for _, layer := range [][]middleware.Bound{rt.GlobalMW, rt.CtrlMW, rt.MethodMW} {
+		for _, bound := range layer {
+			name := strings.TrimSpace(bound.MW.Spec().Name)
+			if name == "" {
+				continue
+			}
+			if _, exists := seen[name]; exists {
+				continue
+			}
+			seen[name] = struct{}{}
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return []string{"(none)"}
+	}
+	return names
 }
 
 func colorizeHTTPMethod(method string) string {
@@ -465,6 +578,101 @@ func colorizeHTTPMethod(method string) string {
 	default:
 		return method
 	}
+}
+
+type recoveryFrame struct {
+	Func string `json:"func"`
+	File string `json:"file"`
+	Line int    `json:"line"`
+}
+
+func buildRecoveryReport(recovered any) (string, []recoveryFrame, []string) {
+	panicText := fmt.Sprint(recovered)
+	frames := collectRecoveryFrames()
+	return panicText, frames, formatRecoveryTree(frames)
+}
+
+func collectRecoveryFrames() []recoveryFrame {
+	pcs := make([]uintptr, 64)
+	n := runtime.Callers(3, pcs)
+	if n == 0 {
+		return nil
+	}
+
+	iter := runtime.CallersFrames(pcs[:n])
+	frames := make([]recoveryFrame, 0, 6)
+	fallback := make([]recoveryFrame, 0, 6)
+	for {
+		frame, more := iter.Next()
+		if shouldSkipRecoveryFrame(frame) {
+			if !more {
+				break
+			}
+			continue
+		}
+
+		item := recoveryFrame{Func: frame.Function, File: filepath.ToSlash(frame.File), Line: frame.Line}
+		if isProjectRecoveryFrame(frame) {
+			frames = append(frames, item)
+		} else if len(fallback) < 6 {
+			fallback = append(fallback, item)
+		}
+
+		if len(frames) >= 6 {
+			break
+		}
+		if !more {
+			break
+		}
+	}
+
+	if len(frames) == 0 {
+		return fallback
+	}
+	return frames
+}
+
+func shouldSkipRecoveryFrame(frame runtime.Frame) bool {
+	fn := frame.Function
+	if fn == "" {
+		return true
+	}
+	if strings.HasPrefix(fn, "runtime.") {
+		return true
+	}
+	if strings.Contains(filepath.ToSlash(frame.File), "/runtime/") && strings.Contains(fn, "panic") {
+		return true
+	}
+	if strings.Contains(fn, "buildRecoveryReport") || strings.Contains(fn, "collectRecoveryFrames") || strings.Contains(fn, "formatRecoveryTree") {
+		return true
+	}
+	if strings.Contains(fn, "registerRoutes.func1.2") {
+		return true
+	}
+	return false
+}
+
+func isProjectRecoveryFrame(frame runtime.Frame) bool {
+	file := filepath.ToSlash(frame.File)
+	return strings.Contains(frame.Function, "github.com/linxlib/fw/v2/") || strings.Contains(file, "/fw/")
+}
+
+func formatRecoveryTree(frames []recoveryFrame) []string {
+	if len(frames) == 0 {
+		return []string{"(no stack frames available)"}
+	}
+	out := make([]string, 0, len(frames)*2)
+	for i, frame := range frames {
+		branch := "├─"
+		indent := "│  "
+		if i == len(frames)-1 {
+			branch = "└─"
+			indent = "   "
+		}
+		out = append(out, fmt.Sprintf("%s %d. %s", branch, i+1, frame.Func))
+		out = append(out, fmt.Sprintf("%s%s:%d", indent, frame.File, frame.Line))
+	}
+	return out
 }
 
 func parseHTTPRoutes(doc *astp.CommentGroup) []httpRoute {

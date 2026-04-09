@@ -17,10 +17,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	e.EmbedProject(astpData)
 
 	// Controllers, middlewares and services are auto-registered by generated code.
-	log.Println("starting server...")
+
+	log.Println("starting server ...")
 	if err := e.ListenAndServe(); err != nil {
 		panic(err)
 	}

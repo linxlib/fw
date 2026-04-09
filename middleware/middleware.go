@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"github.com/linxlib/fw/context"
+	"github.com/linxlib/fw/v2/context"
 )
 
 type Handler func(context.Context) error

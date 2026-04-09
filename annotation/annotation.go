@@ -3,7 +3,7 @@ package annotation
 import (
 	"strings"
 
-	"github.com/linxlib/fw/astp"
+	"github.com/linxlib/fw/v2/astp"
 )
 
 type Parsed struct {

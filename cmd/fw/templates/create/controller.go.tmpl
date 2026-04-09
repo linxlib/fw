@@ -1,0 +1,19 @@
+package controllers
+
+import (
+	"github.com/linxlib/fw/v2/context"
+	"github.com/valyala/fasthttp"
+)
+
+// {{ .TypeName }} handles {{ .Name }} requests.
+// @Controller
+// @Route {{ .Route }}
+type {{ .TypeName }} struct{}
+
+{{- if .GenerateMethod }}
+// {{ .MethodName }} gets {{ .Name }}.
+// @GET /{{ .NameLower }}
+func (c *{{ .TypeName }}) {{ .MethodName }}(ctx context.Context) error {
+	return ctx.Respond(fasthttp.StatusOK, 0, "ok", nil)
+}
+{{- end }}

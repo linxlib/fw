@@ -3,9 +3,10 @@ package services
 import (
 	"fmt"
 
-	"github.com/linxlib/fw/cmd/example/models"
+	"github.com/linxlib/fw/v2/cmd/example/models"
 )
 
+// @Service
 type UserService struct{}
 
 func NewUserService() *UserService {

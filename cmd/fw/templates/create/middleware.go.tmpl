@@ -1,0 +1,22 @@
+package middlewares
+
+import (
+	"github.com/linxlib/fw/v2/context"
+	"github.com/linxlib/fw/v2/middleware"
+)
+
+// {{ .TypeName }} handles {{ .Name }} middleware logic.
+// @Middleware
+type {{ .TypeName }} struct{}
+
+func ({{ .TypeName }}) Spec() middleware.AnnotationSpec {
+	return middleware.AnnotationSpec{
+		Name:  "{{ .Name }}",
+		Scope: middleware.ScopeBoth,
+		Stage: middleware.StageBoth,
+	}
+}
+
+func ({{ .TypeName }}) Handle(ctx context.Context, _ middleware.AnnotationArgs, next middleware.Handler) error {
+	return next(ctx)
+}

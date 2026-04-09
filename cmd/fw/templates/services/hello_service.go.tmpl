@@ -1,0 +1,26 @@
+package services
+
+import "time"
+
+// HelloService is demo business logic.
+// @Service
+type HelloService struct{}
+
+func NewHelloService() *HelloService {
+	return &HelloService{}
+}
+
+func (s *HelloService) Message() string {
+	return "Hello, World!"
+}
+
+func (s *HelloService) Greeting(name string) string {
+	if name == "" {
+		return s.Message()
+	}
+	return "Hello, " + name + "!"
+}
+
+func (s *HelloService) NowRFC3339() string {
+	return time.Now().Format(time.RFC3339)
+}

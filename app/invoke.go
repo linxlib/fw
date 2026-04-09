@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/linxlib/fw/astp"
-	ctxpkg "github.com/linxlib/fw/context"
-	"github.com/linxlib/fw/inject"
+	"github.com/linxlib/fw/v2/astp"
+	ctxpkg "github.com/linxlib/fw/v2/context"
+	"github.com/linxlib/fw/v2/inject"
 	"github.com/valyala/fasthttp"
 )
 

@@ -13,11 +13,12 @@ import (
 )
 
 type Logger struct {
-	mu       sync.Mutex
-	level    Level
-	console  bool
-	fileOut  io.Writer
-	basePath string
+	mu         sync.Mutex
+	level      Level
+	console    bool
+	consoleOut io.Writer
+	fileOut    io.Writer
+	basePath   string
 }
 
 type Level int
@@ -44,7 +45,7 @@ func ParseLevel(s string) Level {
 }
 
 func New(level string, output string, filePath string, enableFile bool) (*Logger, error) {
-	l := &Logger{level: ParseLevel(level), console: true}
+	l := &Logger{level: ParseLevel(level), console: true, consoleOut: os.Stdout}
 	output = strings.ToLower(strings.TrimSpace(output))
 	if output == "file" {
 		l.console = false
@@ -83,18 +84,29 @@ func (l *Logger) log(level Level, tag string, format string, args ...any) {
 	defer l.mu.Unlock()
 
 	if l.console {
+		styled := plain
 		switch level {
 		case DebugLevel:
-			pterm.NewStyle(pterm.FgLightBlue).Print(plain)
+			styled = pterm.NewStyle(pterm.FgLightBlue).Sprint(plain)
 		case InfoLevel:
-			pterm.NewStyle(pterm.FgGreen).Print(plain)
+			styled = pterm.NewStyle(pterm.FgGreen).Sprint(plain)
 		case WarnLevel:
-			pterm.NewStyle(pterm.FgYellow).Print(plain)
+			styled = pterm.NewStyle(pterm.FgYellow).Sprint(plain)
 		case ErrorLevel:
-			pterm.NewStyle(pterm.FgRed).Print(plain)
+			styled = pterm.NewStyle(pterm.FgRed).Sprint(plain)
 		}
+		_, _ = io.WriteString(l.consoleOut, styled)
 	}
 	if l.fileOut != nil {
 		_, _ = io.WriteString(l.fileOut, plain)
 	}
+}
+
+func (l *Logger) SetConsoleWriter(w io.Writer) {
+	if w == nil {
+		w = io.Discard
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.consoleOut = w
 }

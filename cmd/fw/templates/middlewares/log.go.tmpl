@@ -1,0 +1,34 @@
+package middlewares
+
+import (
+	"log"
+	"time"
+
+	"github.com/linxlib/fw/v2/context"
+	"github.com/linxlib/fw/v2/middleware"
+)
+
+// LogMiddleware logs request method, path and duration.
+// @Middleware
+// @Global
+type LogMiddleware struct{}
+
+func (LogMiddleware) Spec() middleware.AnnotationSpec {
+	return middleware.AnnotationSpec{
+		Name:  "Log",
+		Scope: middleware.ScopeBoth,
+		Stage: middleware.StageBoth,
+	}
+}
+
+func (LogMiddleware) Handle(ctx context.Context, _ middleware.AnnotationArgs, next middleware.Handler) error {
+	start := time.Now()
+	raw := ctx.Raw()
+	log.Printf("--> %s %s", string(raw.Method()), string(raw.RequestURI()))
+
+	err := next(ctx)
+
+	status := raw.Response.StatusCode()
+	log.Printf("<-- %s %s %d %s", string(raw.Method()), string(raw.RequestURI()), status, time.Since(start))
+	return err
+}

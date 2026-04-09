@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/linxlib/fw/astp"
+	"github.com/linxlib/fw/v2/astp"
 )
 
 func main() {

@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -12,7 +11,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/linxlib/fw/astp"
+	"github.com/linxlib/fw/v2/astp"
+	"github.com/pterm/pterm"
+	"github.com/spf13/cobra"
 )
 
 type buildOptions struct {
@@ -22,44 +23,53 @@ type buildOptions struct {
 	dir    string // working directory (positional or -dir)
 }
 
-func runBuild(args []string) error {
+func newBuildCmd() *cobra.Command {
 	var opts buildOptions
+	cmd := &cobra.Command{
+		Use:   "build [directory]",
+		Short: "Build a project from a working directory",
+		Long:  `Run pre-build flow, compile the project from the target working directory, then run post-build flow.`,
+		Example: `  fw build
+  fw build -o myapp
+  fw build -os linux -arch amd64
+  fw build -os macos -arch arm64 -o app
+  fw build ./cmd/server`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			effective := opts
+			if len(args) > 0 {
+				effective.dir = args[0]
+			}
 
-	fs := flag.NewFlagSet("build", flag.ExitOnError)
-	fs.StringVar(&opts.output, "o", "", "output binary name (default: directory name)")
-	fs.StringVar(&opts.goos, "os", "", "target OS: windows, linux, macos (default: current)")
-	fs.StringVar(&opts.goarch, "arch", "", "target arch: amd64, arm64 (default: current)")
-	fs.StringVar(&opts.dir, "dir", ".", "project directory")
-	fs.Usage = func() {
-		fmt.Print(`Usage: fw build [flags] [directory]
-
-Run pre-build flow, compile the project, then run post-build flow.
-
-Flags:
-`)
-		fs.PrintDefaults()
-		fmt.Print(`
-Examples:
-  fw build                              # pre-build + build + post-build
-  fw build -o myapp                     # custom output name
-  fw build -os linux -arch amd64        # cross-compile for Linux amd64
-  fw build -os macos -arch arm64 -o app # cross-compile for macOS arm64
-  fw build ./cmd/server                 # build specific directory
-`)
-	}
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-	if fs.NArg() > 0 {
-		opts.dir = fs.Arg(0)
+			if err := runBuild(effective); err != nil {
+				return fmt.Errorf("fw build: %w", err)
+			}
+			return nil
+		},
 	}
 
+	cmd.Flags().StringVarP(&opts.output, "output", "o", "", "output binary name (default: directory name)")
+	cmd.Flags().StringVar(&opts.goos, "os", "", "target OS: windows, linux, macos (default: current)")
+	cmd.Flags().StringVar(&opts.goarch, "arch", "", "target arch: amd64, arm64 (default: current)")
+	cmd.Flags().StringVar(&opts.dir, "dir", ".", "project working directory")
+
+	return cmd
+}
+
+func runBuild(opts buildOptions) error {
 	absDir, err := filepath.Abs(opts.dir)
 	if err != nil {
 		return err
 	}
 	if _, err := os.Stat(absDir); err != nil {
 		return fmt.Errorf("directory not found: %s", absDir)
+	}
+	info, err := os.Stat(absDir)
+	if err != nil {
+		return fmt.Errorf("stat working directory: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("working directory must be a directory: %s", absDir)
 	}
 
 	targetOS := opts.goos
@@ -93,55 +103,88 @@ Examples:
 	}
 
 	// Step 1: Pre-build flow
-	fmt.Printf("[1/3] Running pre-build flow ...\n")
-	preGenerateCmd := exec.Command("go", "generate", "./...")
-	preGenerateCmd.Dir = absDir
-	preGenerateCmd.Stdout = os.Stdout
-	preGenerateCmd.Stderr = os.Stderr
-	if err := preGenerateCmd.Run(); err != nil {
-		return fmt.Errorf("pre-build go generate: %w", err)
-	}
-
-	fmt.Printf("      generating %s ...\n", astp.DefaultOutputFile)
-	g := astp.NewGenerator()
-	g.ExportedOnly = true
-	if err := g.Generate(absDir, ""); err != nil {
-		return fmt.Errorf("pre-build astp generation: %w", err)
-	}
 	astpFile := filepath.Join(absDir, astp.DefaultOutputFile)
-	fmt.Printf("      %s\n", astpFile)
+	if err := runSpinnerStep("[1/3] Running pre-build flow", func(sp *pterm.SpinnerPrinter) error {
+		sp.UpdateText("[1/3] Running pre-build flow (go generate ./...)")
+		preGenerateCmd := exec.Command("go", "generate", "./...")
+		preGenerateCmd.Dir = absDir
+		preGenerateCmd.Stdout = os.Stdout
+		preGenerateCmd.Stderr = os.Stderr
+		if err := preGenerateCmd.Run(); err != nil {
+			return fmt.Errorf("pre-build go generate: %w", err)
+		}
+
+		sp.UpdateText(fmt.Sprintf("[1/3] Running pre-build flow (generating %s)", astp.DefaultOutputFile))
+		g := astp.NewGenerator()
+		g.ExportedOnly = true
+		if err := g.Generate(absDir, ""); err != nil {
+			return fmt.Errorf("pre-build astp generation: %w", err)
+		}
+
+		sp.UpdateText(fmt.Sprintf("[1/3] Running pre-build flow (%s)", astpFile))
+		return nil
+	}); err != nil {
+		return err
+	}
 
 	// Step 2: Compile
-	fmt.Printf("[2/3] Compiling %s/%s -> %s ...\n", targetOS, targetArch, outName)
-	buildArgs := []string{"build", "-o", outName}
-	buildArgs = append(buildArgs, ".")
+	if err := runSpinnerStep(fmt.Sprintf("[2/3] Compiling %s/%s -> %s", targetOS, targetArch, outName), func(sp *pterm.SpinnerPrinter) error {
+		buildArgs := []string{"build", "-o", outName, "."}
+		cmd := exec.Command("go", buildArgs...)
+		cmd.Dir = absDir
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Env = buildEnv(targetOS, targetArch)
 
-	cmd := exec.Command("go", buildArgs...)
-	cmd.Dir = absDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Env = buildEnv(targetOS, targetArch)
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("go build: %w", err)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("go build: %w", err)
+		}
+		sp.UpdateText(fmt.Sprintf("[2/3] Compiled %s/%s -> %s", targetOS, targetArch, outName))
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	// Step 3: Post-build flow
-	fmt.Printf("[3/3] Running post-build flow ...\n")
 	outPath := filepath.Join(absDir, outName)
-	info, err := os.Stat(outPath)
-	if err != nil {
-		return fmt.Errorf("post-build output check: %w", err)
+	var artifactInfo os.FileInfo
+	var checksum string
+	if err := runSpinnerStep("[3/3] Running post-build flow", func(sp *pterm.SpinnerPrinter) error {
+		sp.UpdateText("[3/3] Running post-build flow (artifact check)")
+		var err error
+		artifactInfo, err = os.Stat(outPath)
+		if err != nil {
+			return fmt.Errorf("post-build output check: %w", err)
+		}
+
+		sp.UpdateText("[3/3] Running post-build flow (sha256)")
+		checksum, err = fileSHA256(outPath)
+		if err != nil {
+			return fmt.Errorf("post-build checksum: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
-	checksum, err := fileSHA256(outPath)
-	if err != nil {
-		return fmt.Errorf("post-build checksum: %w", err)
-	}
-
-	fmt.Printf("      artifact: %s (%s)\n", outPath, humanSize(info.Size()))
+	fmt.Printf("      artifact: %s (%s)\n", outPath, humanSize(artifactInfo.Size()))
 	fmt.Printf("      sha256 : %s\n", checksum)
 	fmt.Printf("\nBuild succeeded.\n")
+	return nil
+}
+
+func runSpinnerStep(title string, fn func(sp *pterm.SpinnerPrinter) error) error {
+	sp, err := pterm.DefaultSpinner.Start(title + " ...")
+	if err != nil {
+		return fmt.Errorf("start spinner: %w", err)
+	}
+
+	if err := fn(sp); err != nil {
+		sp.Fail(title + " failed")
+		return err
+	}
+
+	sp.Success(title + " done")
 	return nil
 }
 
