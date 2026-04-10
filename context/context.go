@@ -27,6 +27,10 @@ type Context interface {
 	Body() []byte
 	BindJSON(out any) error
 	Respond(statusCode int, code int, message string, data any) error
+	RawResponse() ResponseBuilder
+	StatusOK(message ...string) ResponseBuilder
+	StatusParamError(message ...string) ResponseBuilder
+	StatusServerError(message ...string) ResponseBuilder
 	Container() inject.Injector
 	SetContainer(inject.Injector)
 	SetRouteParams(map[string]string)
@@ -52,6 +56,13 @@ type Context interface {
 	// returns an SSEWriter that can be used to send events to the client.
 	// The provided callback receives the writer; when the callback returns, the stream ends.
 	SSE(fn func(w *SSEWriter)) error
+}
+
+type ResponseBuilder interface {
+	Message(message string) ResponseBuilder
+	Code(code int) ResponseBuilder
+	Data(data any) error
+	Send() error
 }
 
 type FWContext struct {
@@ -107,7 +118,63 @@ func (c *FWContext) Respond(statusCode int, code int, message string, data any) 
 	return c.responder.Write(c.raw, statusCode, code, message, data, c.TraceID())
 }
 
+func (c *FWContext) RawResponse() ResponseBuilder {
+	return &responseBuilder{ctx: c, statusCode: fasthttp.StatusOK, raw: true}
+}
+
+func (c *FWContext) StatusOK(message ...string) ResponseBuilder {
+	return c.newResponseBuilder(fasthttp.StatusOK, 0, "ok", message...)
+}
+
+func (c *FWContext) StatusParamError(message ...string) ResponseBuilder {
+	return c.newResponseBuilder(fasthttp.StatusBadRequest, 40001, "invalid request", message...)
+}
+
+func (c *FWContext) StatusServerError(message ...string) ResponseBuilder {
+	return c.newResponseBuilder(fasthttp.StatusInternalServerError, 50000, "internal error", message...)
+}
+
+func (c *FWContext) newResponseBuilder(statusCode int, code int, defaultMessage string, message ...string) ResponseBuilder {
+	b := &responseBuilder{ctx: c, statusCode: statusCode, code: code, message: defaultMessage}
+	if len(message) > 0 {
+		b.message = message[0]
+	}
+	return b
+}
+
 func (c *FWContext) Set(key string, value any) { c.store[key] = value }
+
+type responseBuilder struct {
+	ctx        *FWContext
+	statusCode int
+	code       int
+	message    string
+	raw        bool
+}
+
+func (b *responseBuilder) Message(message string) ResponseBuilder {
+	b.message = message
+	return b
+}
+
+func (b *responseBuilder) Code(code int) ResponseBuilder {
+	b.code = code
+	return b
+}
+
+func (b *responseBuilder) Data(data any) error {
+	if b.raw {
+		return b.ctx.responder.WriteRaw(b.ctx.raw, b.statusCode, data)
+	}
+	return b.ctx.responder.Write(b.ctx.raw, b.statusCode, b.code, b.message, data, b.ctx.TraceID())
+}
+
+func (b *responseBuilder) Send() error {
+	if b.raw {
+		return b.ctx.responder.WriteRaw(b.ctx.raw, b.statusCode, nil)
+	}
+	return b.ctx.responder.Write(b.ctx.raw, b.statusCode, b.code, b.message, nil, b.ctx.TraceID())
+}
 
 func (c *FWContext) Get(key string) (any, bool) {
 	v, ok := c.store[key]

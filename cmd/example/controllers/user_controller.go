@@ -8,7 +8,6 @@ import (
 	"github.com/linxlib/fw/v2/cmd/example/models"
 	"github.com/linxlib/fw/v2/cmd/example/services"
 	ctxpkg "github.com/linxlib/fw/v2/context"
-	"github.com/valyala/fasthttp"
 )
 
 // UserController 用户
@@ -32,14 +31,14 @@ func (c *UserController) ModifyUser(ctx ctxpkg.Context, query models.UserQuery, 
 	role := ctx.GetString(middlewares.AuthorizationKeyUserRole)
 	fmt.Printf("authenticated user: id=%d role=%s\n", userID, role)
 
-	return 1, ctx.Respond(fasthttp.StatusOK, 0, "ok", c.Service.BuildModifyUserResponse(query, userID, role, db))
+	return 1, ctx.StatusOK().Data(c.Service.BuildModifyUserResponse(query, userID, role, db))
 }
 
 // HealthCheck 健康检查（无需鉴权）
 // @GET /health
 // @Ignore(Authorization,Global)
 func (c *UserController) HealthCheck(ctx ctxpkg.Context) error {
-	return ctx.Respond(fasthttp.StatusOK, 0, "healthy", nil)
+	return ctx.StatusOK("healthy").Send()
 }
 
 // Echo handles WebSocket messages. Each incoming []byte is echoed back with a prefix.

@@ -26,7 +26,7 @@ Runtime dependencies:
 - Request-scoped dependency injection
 - Automatic binding for path, query, header, and body parameters
 - Built-in request context helper
-- Unified JSON response envelope with pluggable formatter/encoder
+- Automatic handler return serialization plus a unified JSON response envelope with pluggable formatter/encoder
 - Panic recovery and request logging
 - Automatic OpenAPI document generation and Swagger UI
 - `cmd/fw` CLI for project creation, build flow, and code scaffolding
@@ -138,6 +138,11 @@ Supported annotation styles:
 - `@X value`
 - `@X(a,b)`
 - `@X(k=v, role=admin)`
+
+Handler-specific response annotations used by the framework include:
+
+- `@Response(...)`: choose which return value drives the OpenAPI response schema
+- `@RawResponse`: write the first non-`error` return value directly without the default `code/message/data` envelope
 
 ## Controller Usage
 
@@ -463,6 +468,10 @@ Useful methods:
 - `Body()`
 - `BindJSON(out)`
 - `Respond(statusCode, code, message, data)`
+- `RawResponse()`
+- `StatusOK(message ...)`
+- `StatusParamError(message ...)`
+- `StatusServerError(message ...)`
 - `Set(key, value)`
 - `Get(key)`
 - `MustGet(key)`
@@ -516,11 +525,86 @@ Default response envelope:
 
 ### Normal response
 
-Use `ctx.Respond(...)` directly:
+Use the chainable response builder for common cases:
 
 ```go
-return ctx.Respond(fasthttp.StatusOK, 0, "ok", data)
+return ctx.StatusOK().Data(data)
 ```
+
+Examples:
+
+```go
+return ctx.StatusOK().Message("saved").Data(result)
+return ctx.StatusOK("healthy").Send()
+return ctx.StatusParamError("param xx invalid").Send()
+return ctx.StatusServerError().Message("").Send()
+```
+
+`Respond(statusCode, code, message, data)` is still available when you want to set everything explicitly.
+
+### Automatic response from handler return values
+
+If a handler returns one or more values and does not write a response itself, FW uses the first non-`error` return value as the success payload.
+
+```go
+// @GET /profile
+func (c *UserController) Profile() map[string]any {
+	return map[string]any{"name": "alice"}
+}
+```
+
+The response is still wrapped by default:
+
+```json
+{"code":0,"message":"ok","data":{"name":"alice"}}
+```
+
+If the handler returns an `error` result and it is not `nil`, FW treats the request as failed and does not write a success response.
+
+### Raw response with `@RawResponse`
+
+Use `@RawResponse` on a handler method when you want the first non-`error` return value to be written directly.
+
+```go
+// @GET /profile/raw
+// @RawResponse
+func (c *UserController) ProfileRaw() map[string]any {
+	return map[string]any{"name": "alice"}
+}
+```
+
+Response body:
+
+```json
+{"name":"alice"}
+```
+
+Notes:
+
+- `@RawResponse` is method-only behavior
+- It only affects framework-managed automatic writes from return values
+- If the handler or middleware already wrote a response, FW does not overwrite it
+- `ctx.Respond(...)` and `ctx.StatusOK()` still use the configured formatter and keep the normal envelope
+
+### Manual raw response with `ctx.RawResponse()`
+
+Use `ctx.RawResponse()` when you want a handler or middleware to write a payload directly without the default envelope.
+
+```go
+return ctx.RawResponse().Data("ok")
+```
+
+Response body:
+
+```json
+"ok"
+```
+
+Notes:
+
+- `ctx.RawResponse()` is for manual response writes
+- `@RawResponse` is for automatic writes from handler return values
+- Both paths still use the configured encoder
 
 ### Automatic empty success response
 
@@ -575,6 +659,8 @@ Supported forms:
 - `@Response(result=1)`
 
 Positive indexes are 1-based.
+
+If the handler also has `@RawResponse`, OpenAPI uses the selected return value as the top-level `200` response schema directly instead of wrapping it under `data`.
 
 ## Configuration
 

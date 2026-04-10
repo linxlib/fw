@@ -13,7 +13,7 @@ Full guides:
 - Automatic discovery and registration of `@Controller`, `@Service`, and `@Middleware`
 - Global, controller-level, and method-level middleware with deterministic merge order
 - Request parameter injection from path, query, header, and JSON body
-- Built-in request context wrapper, unified response envelope, and panic recovery
+- Built-in request context wrapper, automatic method return responses, unified response envelope, and panic recovery
 - Automatic OpenAPI generation plus Swagger UI at `/docs`
 - `cmd/fw` CLI for project scaffolding, building, and component generation
 
@@ -60,9 +60,16 @@ type UserController struct{}
 // GetUser returns one user.
 // @GET /:id
 func (c *UserController) GetUser(ctx context.Context, id string) error {
-	return ctx.Respond(fasthttp.StatusOK, 0, "ok", map[string]any{
+	return ctx.StatusOK().Data(map[string]any{
 		"id": id,
 	})
+}
+
+// GetProfile returns raw JSON without the default envelope.
+// @GET /profile
+// @RawResponse
+func (c *UserController) GetProfile() map[string]any {
+	return map[string]any{"name": "alice"}
 }
 ```
 

@@ -292,12 +292,16 @@ func responseSchemaForMethod(q *astp.Query, method *astp.Func) *openapi.Schema {
 	if method == nil {
 		return nil
 	}
+	rawResponse := hasRawResponseAnnotation(method)
 	idx, hasOverride := responseIndexOverride(method)
 	if hasOverride {
 		if idx >= 0 && idx < len(method.Results) {
 			r := method.Results[idx]
 			if r != nil && r.Type != nil && !isErrorTypeRef(r.Type) {
 				s := schemaFromTypeRef(q, r.Type)
+				if rawResponse {
+					return &s
+				}
 				env := envelopeResponseSchema(s)
 				return &env
 			}
@@ -313,6 +317,9 @@ func responseSchemaForMethod(q *astp.Query, method *astp.Func) *openapi.Schema {
 			continue
 		}
 		s := schemaFromTypeRef(q, r.Type)
+		if rawResponse {
+			return &s
+		}
 		env := envelopeResponseSchema(s)
 		return &env
 	}

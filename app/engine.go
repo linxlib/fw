@@ -453,7 +453,7 @@ func (e *Engine) registerRoutes() error {
 							"stack": stackPayload,
 						}
 					}
-					_ = ctxpkg.New(raw, e.responseManager).Respond(fasthttp.StatusInternalServerError, 50000, "internal error", data)
+					_ = ctxpkg.New(raw, e.responseManager).StatusServerError().Data(data)
 				}()
 			}
 
@@ -470,24 +470,38 @@ func (e *Engine) registerRoutes() error {
 			reqContainer, err := buildRequestContainer(c, e.globalContainer, rtCopy.AstMethod, rtCopy.ParamHints)
 			if err != nil {
 				e.log.Errorf("build request container failed: %v", err)
-				_ = c.Respond(fasthttp.StatusBadRequest, 40001, "invalid request", nil)
+				_ = c.StatusParamError().Send()
 				return
 			}
 			c.SetContainer(reqContainer)
+			rawResponse := hasRawResponseAnnotation(rtCopy.AstMethod)
 			h := middleware.Chain(func(ctx ctxpkg.Context) error {
-				_, err := invokeMethod(reqContainer, rtCopy.AstMethod, rtCopy.HandlerValue, rtCopy.ParamHints)
+				results, err := invokeMethod(reqContainer, rtCopy.AstMethod, rtCopy.HandlerValue, rtCopy.ParamHints)
 				if err != nil {
 					return err
 				}
-				if raw.Response.StatusCode() == 0 {
-					return ctx.Respond(fasthttp.StatusOK, 0, "ok", nil)
+				data, err := extractMethodResponse(results)
+				if err != nil {
+					return err
+				}
+				if responseWritten(raw) {
+					return nil
+				}
+				if data != nil {
+					if rawResponse {
+						return e.responseManager.WriteRaw(raw, fasthttp.StatusOK, data)
+					}
+					return ctx.StatusOK().Data(data)
+				}
+				if !responseWritten(raw) {
+					return ctx.StatusOK().Send()
 				}
 				return nil
 			}, rtCopy.GlobalMW, rtCopy.CtrlMW, rtCopy.MethodMW)
 			if err := h(c); err != nil {
 				e.log.Errorf("handler failed: %v", err)
-				if raw.Response.StatusCode() == 0 {
-					_ = c.Respond(fasthttp.StatusInternalServerError, 50000, "internal error", nil)
+				if !responseWritten(raw) {
+					_ = c.StatusServerError().Send()
 				}
 			}
 		})

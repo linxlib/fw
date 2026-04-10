@@ -26,7 +26,7 @@ github.com/linxlib/fw/v2
 - 请求级依赖注入
 - 自动绑定路径、查询、请求头、请求体参数
 - 更易用的请求上下文封装
-- 统一 JSON 响应结构，可替换格式化器和编码器
+- 自动序列化方法返回值，并提供统一 JSON 响应结构，可替换格式化器和编码器
 - Panic 恢复与请求日志
 - 自动生成 OpenAPI 文档和 Swagger UI
 - 提供 `cmd/fw` CLI 用于初始化项目、构建和生成代码骨架
@@ -138,6 +138,11 @@ FW 使用 Go 注释中的注解，例如 `// @GET /users`、`// @Authorization(A
 - `@X value`
 - `@X(a,b)`
 - `@X(k=v, role=admin)`
+
+和响应相关的框架注解还包括：
+
+- `@Response(...)`：指定哪个返回值用于 OpenAPI 响应结构推断
+- `@RawResponse`：让第一个非 `error` 返回值直接输出，不再包裹默认的 `code/message/data`
 
 ## Controller 用法
 
@@ -463,6 +468,10 @@ FW 对 `*fasthttp.RequestCtx` 做了更友好的封装。
 - `Body()`
 - `BindJSON(out)`
 - `Respond(statusCode, code, message, data)`
+- `RawResponse()`
+- `StatusOK(message ...)`
+- `StatusParamError(message ...)`
+- `StatusServerError(message ...)`
 - `Set(key, value)`
 - `Get(key)`
 - `MustGet(key)`
@@ -516,11 +525,86 @@ func (c *UserController) Echo(ctx context.Context, msg []byte) error {
 
 ### 普通返回
 
-直接调用 `ctx.Respond(...)`：
+常见场景推荐使用链式响应 builder：
 
 ```go
-return ctx.Respond(fasthttp.StatusOK, 0, "ok", data)
+return ctx.StatusOK().Data(data)
 ```
+
+例如：
+
+```go
+return ctx.StatusOK().Message("saved").Data(result)
+return ctx.StatusOK("healthy").Send()
+return ctx.StatusParamError("param xx invalid").Send()
+return ctx.StatusServerError().Message("").Send()
+```
+
+如果你希望完全手动指定 `statusCode/code/message/data`，仍然可以继续使用 `Respond(...)`。
+
+### 根据方法返回值自动输出响应
+
+如果处理函数返回了值，并且它自己没有主动写响应，FW 会把第一个非 `error` 返回值当作成功响应数据。
+
+```go
+// @GET /profile
+func (c *UserController) Profile() map[string]any {
+	return map[string]any{"name": "alice"}
+}
+```
+
+默认仍然会包裹成统一结构：
+
+```json
+{"code":0,"message":"ok","data":{"name":"alice"}}
+```
+
+如果方法返回了 `error`，且该 `error` 不为 `nil`，FW 会把它视为失败，不再输出成功响应。
+
+### 使用 `@RawResponse` 输出原始响应
+
+当你希望方法返回值直接作为响应体输出时，可以在方法上标记 `@RawResponse`。
+
+```go
+// @GET /profile/raw
+// @RawResponse
+func (c *UserController) ProfileRaw() map[string]any {
+	return map[string]any{"name": "alice"}
+}
+```
+
+响应体会变成：
+
+```json
+{"name":"alice"}
+```
+
+说明：
+
+- `@RawResponse` 只作用于方法级
+- 它只影响框架根据返回值自动写响应的行为
+- 如果方法或中间件已经写过响应，FW 不会再覆盖
+- `ctx.Respond(...)` 和 `ctx.StatusOK()` 这类方法仍然会走当前配置的格式化器，保留默认包裹结构
+
+### 使用 `ctx.RawResponse()` 手动输出原始响应
+
+如果你希望在处理函数或中间件里直接输出原始响应体，而不是默认包裹结构，可以使用 `ctx.RawResponse()`。
+
+```go
+return ctx.RawResponse().Data("ok")
+```
+
+响应体会变成：
+
+```json
+"ok"
+```
+
+说明：
+
+- `ctx.RawResponse()` 用于手动写响应
+- `@RawResponse` 用于方法返回值的自动响应
+- 两者仍然会走当前配置的编码器
 
 ### 默认空成功响应
 
@@ -575,6 +659,8 @@ e.SetResponse(customFormatter, customEncoder)
 - `@Response(result=1)`
 
 正整数索引按 1 开始计数。
+
+如果方法同时标记了 `@RawResponse`，那么 OpenAPI 会直接把选中的返回值作为顶层 `200` 响应结构，而不是再放到 `data` 字段下面。
 
 ## 配置
 

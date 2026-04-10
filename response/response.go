@@ -59,3 +59,7 @@ func (m *Manager) Write(ctx *fasthttp.RequestCtx, statusCode int, code int, mess
 	payload := m.formatter.Format(code, message, data, traceID)
 	return m.encoder.Encode(ctx, statusCode, payload)
 }
+
+func (m *Manager) WriteRaw(ctx *fasthttp.RequestCtx, statusCode int, payload any) error {
+	return m.encoder.Encode(ctx, statusCode, payload)
+}
