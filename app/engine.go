@@ -243,6 +243,13 @@ func (e *Engine) ListenAndServe() error {
 		return err
 	}
 	addr := net.JoinHostPort(e.cfg.Server.Host, fmt.Sprintf("%d", e.cfg.Server.Port))
+
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("port %d is already in use: %w", e.cfg.Server.Port, err)
+	}
+	ln.Close()
+
 	e.log.Infof("server listening on %s", addr)
 	if e.cfg.OpenAPI.Enabled {
 		e.log.Infof("swagger ui: %s", e.swaggerDocsURL())

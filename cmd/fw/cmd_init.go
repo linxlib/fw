@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -13,6 +14,7 @@ import (
 type initTemplateData struct {
 	Name   string
 	Module string
+	Port   int
 }
 
 type scaffoldTemplate struct {
@@ -120,7 +122,7 @@ func runInit(opts initOptions) error {
 		fmt.Printf("Initializing project in current directory ...\n")
 	}
 
-	data := initTemplateData{Name: opts.projectName, Module: opts.moduleName}
+	data := initTemplateData{Name: opts.projectName, Module: opts.moduleName, Port: time.Now().Year()}
 
 	// Create directory structure
 	dirs := []string{
