@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -34,6 +35,20 @@ func (c *Config) startReload() {
 			}
 		}()
 	})
+}
+
+// StartAutoReload 在运行时开启自动重载(幂等, 可重复调用).
+//
+// 适用于 New 时未开启 AutoReload、之后又需要热重载的场景: 已注册的目标会随对应
+// 顶层 section 的变化被增量重写. interval <= 0 时按 1s 处理; 若轮询已启动则重复
+// 调用不改变既有节奏. AutoReloadCallback 需在调用本方法之前设置.
+func (c *Config) StartAutoReload(interval time.Duration) {
+	if interval <= 0 {
+		interval = time.Second
+	}
+	c.AutoReload = true
+	c.AutoReloadInterval = interval
+	c.startReload()
 }
 
 // Reload 立即执行一次增量重载, 返回本次发生变化的顶层 section 列表(可能为空).
@@ -137,6 +152,12 @@ func (c *Config) reloadTick() ([]string, bool, error) {
 		changedKeys = append(changedKeys, k)
 	}
 	sort.Strings(changedKeys)
+
+	// 检测到需要重载: 在标准输出提示本次发生变化的 section, 便于运行时观察热重载是否生效.
+	// 与失败提示一致, Silent 模式下不输出.
+	if !c.Silent {
+		fmt.Printf("config: reload detected, changed sections: [%s]\n", strings.Join(changedKeys, ", "))
+	}
 
 	// 锁外触发回调, 避免用户代码持锁执行
 	c.mu.Unlock()

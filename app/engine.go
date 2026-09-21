@@ -100,6 +100,37 @@ func (e *Engine) SetResponse(formatter response.Formatter, encoder response.Enco
 	e.responseManager = response.NewManager(formatter, encoder)
 }
 
+// EnableConfigReload 开启配置文件热重载(缺省关闭, 需显式开启).
+//
+// interval 为轮询间隔, <=0 时按 1s 处理. 开启后按顶层 section 增量重载: 只有内容
+// 发生变化的 section 对应的内存配置被重写, config 包同时在标准输出打印
+// "config: reload detected, changed sections: [...]" 提示本次变化.
+// 路由表与监听地址在 Build/ListenAndServe 时已确定, 重载不会重建它们, 因此应在
+// New 之后、ListenAndServe 之前调用.
+func (e *Engine) EnableConfigReload(interval time.Duration) {
+	if e == nil || e.loader == nil {
+		return
+	}
+	if interval <= 0 {
+		interval = time.Second
+	}
+	// 先挂回调再启动轮询, 避免轮询 goroutine 读到未初始化的回调字段.
+	e.loader.AutoReloadCallback = e.onConfigReload
+	e.loader.StartAutoReload(interval)
+	if e.log != nil {
+		e.log.Infof("config auto reload enabled, interval %s", interval)
+	}
+}
+
+// onConfigReload 是配置热重载回调: 某个 section 变化后由 config 包在锁外调用.
+// 这里只做观测性日志, 是否采用新值由各读取方自行决定.
+func (e *Engine) onConfigReload(key string, target any) {
+	if e.log == nil {
+		return
+	}
+	e.log.Infof("config reloaded: section %q updated", key)
+}
+
 func (e *Engine) Container() inject.Injector {
 	return e.globalContainer
 }

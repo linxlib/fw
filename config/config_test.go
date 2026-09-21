@@ -1,6 +1,8 @@
 package config
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -285,6 +287,83 @@ func TestReloadSectionRemoved(t *testing.T) {
 	if so.Port != 9000 {
 		t.Fatalf("server target changed unexpectedly: %+v", so)
 	}
+}
+
+// TestReloadPrintsDetectedNotice 验证: 检测到需要重载时在标准输出打印提示,
+// 无变化与 Silent 模式下不打印.
+func TestReloadPrintsDetectedNotice(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(file, []byte(twoSections), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	c := New(&Option{Files: []string{file}})
+	var so serverOpt
+	if err := c.LoadWithKey("server", &so); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	// 文件无变化: 不打印任何内容
+	if out, err := captureStdout(t, func() error { _, err := c.Reload(); return err }); err != nil {
+		t.Fatalf("no-op reload: %v", err)
+	} else if out != "" {
+		t.Fatalf("no-op reload should print nothing, got %q", out)
+	}
+
+	// 修改 server section: 打印变化的 section 列表
+	content := strings.Replace(twoSections, "port: 9000", "port: 9100", 1)
+	if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
+		t.Fatalf("rewrite: %v", err)
+	}
+	fut := time.Now().Add(2 * time.Second)
+	_ = os.Chtimes(file, fut, fut)
+
+	out, err := captureStdout(t, func() error { _, err := c.Reload(); return err })
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	want := "config: reload detected, changed sections: [server]\n"
+	if out != want {
+		t.Fatalf("stdout = %q, want %q", out, want)
+	}
+
+	// Silent 模式下不再输出
+	c.Silent = true
+	content = strings.Replace(content, "port: 9100", "port: 9200", 1)
+	if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
+		t.Fatalf("rewrite: %v", err)
+	}
+	fut = time.Now().Add(3 * time.Second)
+	_ = os.Chtimes(file, fut, fut)
+	if out, err := captureStdout(t, func() error { _, err := c.Reload(); return err }); err != nil {
+		t.Fatalf("silent reload: %v", err)
+	} else if out != "" {
+		t.Fatalf("silent mode should print nothing, got %q", out)
+	}
+}
+
+// captureStdout 捕获 fn 执行期间写入标准输出的内容, 结束后还原 os.Stdout.
+func captureStdout(t *testing.T, fn func() error) (string, error) {
+	t.Helper()
+	orig := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stdout = w
+	defer func() {
+		os.Stdout = orig
+		_ = r.Close()
+	}()
+	done := make(chan string, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+		done <- buf.String()
+	}()
+	callErr := fn()
+	_ = w.Close()
+	return <-done, callErr
 }
 
 // TestAutoReloadPolling 验证轮询线程: 修改文件后 AutoReloadInterval 内自动生效,

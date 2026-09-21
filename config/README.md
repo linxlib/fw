@@ -76,7 +76,9 @@ func main() {
 2. 解析 yaml, 计算各顶层 section 的规范化 sha256, 与上次快照对比;
 3. 只对 变化/新增/删除 的 section 重新解码, 写回其已注册目标(全量目标 `""` 随任一 section 变化刷新);
 4. 单个目标失败回滚其旧值, 其余目标不受影响; 成功后更新快照并在锁外触发
-   `AutoReloadCallback(变化的 key, target)`。
+   `AutoReloadCallback(变化的 key, target)`;
+5. 检测到需要重载时在标准输出打印 `config: reload detected, changed sections: [...]`,
+   列出本次发生变化的顶层 section(`Silent: true` 时不打印; 无变化时不打印)。
 
 变更检测机制(平台相关):
 
@@ -86,3 +88,6 @@ func main() {
   行为与引入监听机制前一致.
 
 也可手动触发: `changed, err := c.Reload()` 返回本次发生变化的 section 列表。
+
+也可在 `New` 之后按需开启(幂等): `c.StartAutoReload(time.Second)`,
+`AutoReloadCallback` 需在调用前设置; fw 引擎对应 `e.EnableConfigReload(interval)`。

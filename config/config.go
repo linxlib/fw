@@ -11,6 +11,8 @@
 //
 // 开启 AutoReload 后, 每个轮询周期只对内容发生变化的顶层 section 重新解码并
 // 写回其关联的内存配置, 其余 section 的内存对象零扰动, 回调也只收到变化的 key.
+// 检测到需要重载时会在标准输出打印 "config: reload detected, changed sections: [...]",
+// 列出本次发生变化的顶层 section(Silent 模式下不输出).
 package config
 
 import (
