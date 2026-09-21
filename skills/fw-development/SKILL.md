@@ -7,7 +7,7 @@ description: 修改 github.com/linxlib/fw 框架源码本身时必须遵守的�
 
 本 skill 是 **fw 框架仓库**开发的强制执行清单。业务应用项目的开发规范见 **`fw-app-development`** skill。仓库里的 `AGENTS.md`、`APP_AGENT.md`、`DOCS_AGENT.md` 是权威详版文档，本 skill 负责告诉你**什么时候该读哪一份、以及哪些事不做就算没做完**。
 
-如果你当前不在 fw 仓库内（skill 被加载到别的目录），先把仓库取下来：`git clone --depth 1 -b v2 https://github.com/linxlib/fw`，或读 Go 模块缓存 `$(go env GOPATH)/pkg/mod/github.com/linxlib/fw/v2@<版本>/`。上述 md 都在仓库根目录。
+如果你当前不在 fw 仓库内（skill 被加载到别的目录），权威文档在这个仓库的根目录：`https://github.com/linxlib/fw`，分支 `v2`，文件为 `AGENTS.md`、`APP_AGENT.md`、`DOCS_AGENT.md`。工作目录或机器上已有源码检出就直接读；否则按你当前 shell 顺手的方式取需要的那几个文件来读，不要为文档去 clone 整个仓库，也不要去翻 Go 模块缓存目录。
 
 ## 第 0 步：先判断你在改什么
 
@@ -45,7 +45,7 @@ docs: 同步 v2.0.1 以来的变更到全部 markdown 文档
 
 ## 交付前必须全部通过
 
-```powershell
+```bash
 gofmt -l .          # 必须无输出（注意：仓库里 config/env.go 历史遗留未格式化，不要顺手改）
 go vet ./...        # 必须无输出
 go test ./...       # 必须全绿
@@ -91,13 +91,11 @@ go test ./...       # 必须全绿
 4. 已删除的特性要**删掉对应章节**，而不是留一段矛盾的说明
 5. 改完通读三个文件，确认互相不矛盾
 
-自查命令：
+自查要点（命令按你当前的 shell 自己写）：
 
-```powershell
-Select-String -Path doc.md,doc_en.md,doc_cn.md -Pattern '过期的关键词'
-# 确认代码围栏成对
-(Get-Content doc_cn.md | Where-Object { $_ -match '^\s*```' }).Count   # 必须是偶数
-```
+- 在三个文档里搜已经删掉的特性的关键词，应当一无所获
+- 确认每个文档的代码围栏成对，数量为偶数
+- 通读三个文件，确认没有互相矛盾的表述
 
 ## 什么时候该换 skill
 

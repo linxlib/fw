@@ -11,17 +11,18 @@ description: 在基于 github.com/linxlib/fw/v2 的业务应用项目中开发�
 
 本 skill 是可执行的步骤清单。**完整规范不在本文件里**，而在 fw 框架仓库的 markdown 文档中——见下一节，用之前先把它们拿到手。
 
-## 第 1 步：拉取权威详版文档
+## 第 1 步：确认权威详版文档在哪
 
-**应用项目里没有框架文档。** 它们是 fw 框架仓库根目录下的 markdown，不在你的 `node_modules`、也不在 `go.sum` 里。本 skill 只是执行清单，遇到本文件没写清的规范，去读原文。
+**应用项目里没有框架文档。** 完整规范在 fw 框架仓库根目录下的 markdown 中，不在 `go.sum` 里，也不会随依赖进到你的项目。本 skill 只是执行清单，遇到没写清的规范，去读原文。
 
-框架仓库：
+仓库位置：
 
 - git 地址：`https://github.com/linxlib/fw`
-- 默认分支：`v2`
+- 分支：`v2`
 - 模块路径：`github.com/linxlib/fw/v2`
+- 下面这些文件都在仓库根目录
 
-需要的文件（仓库根目录）：
+需要读的文件：
 
 | 文件 | 内容 | 什么时候读 |
 |---|---|---|
@@ -32,50 +33,22 @@ description: 在基于 github.com/linxlib/fw/v2 的业务应用项目中开发�
 | `AGENTS.md` | 框架架构与模块地图 | 需要理解框架内部时 |
 | `config/README.md` | 配置库完整说明 | 写配置、加热重载时 |
 
-四种获取方式，按当前环境选最快的：
+### 版本要对齐
 
-**1. 开发机上已有 fw 源码检出（最常见，优先用）**
+文档和代码同一个 tag。先看应用 `go.mod` 里 `github.com/linxlib/fw/v2` 的版本，再读同版本的文档，否则文档描述的行为可能和实际依赖不一致。上面写的是分支 `v2`，具体版本号自行替换。
 
-如果机器上已经 clone 了 fw 仓库，直接读那份根目录的 md，不用下载。不确定位置时：
+### 怎么读，自己判断
 
-```powershell
-Get-ChildItem -Path 'E:/tmp','~/go/src/github.com/linxlib','~/code','~/projects' -Filter 'fw' -Directory -ErrorAction SilentlyContinue
-```
+本 skill 不规定命令——你当前的 shell 可能是 `bash`、`zsh`、`git bash`、`WSL`、`cmd` 或 PowerShell，用你顺手的方式即可。按下面的优先级：
 
-**2. 读 Go 模块缓存（零网络，版本精确）**
+1. **工作目录或同一台机器上已经有 fw 源码检出** → 直接读那份根目录的 md。这是首选，不产生任何新文件
+2. **有网络** → 只取需要的那一两个文件来读，读完即弃。不要为了拿文档去 clone 整个仓库，那会留下一堆无关文件
+3. **两者都没有** → 明确告诉用户"无法核对权威文档，以下按 skill 内的清单执行"，不要凭空推断框架行为
 
-依赖已经 download 过时，文档就在缓存里，按版本号分子目录：
+两个明确不要做：
 
-```powershell
-$gp = go env GOPATH
-Get-ChildItem "$gp/pkg/mod/github.com/linxlib/fw" -Directory | Select-Object Name
-# 取对应版本目录，例如 v2@v2.0.1/APP_AGENT.md
-```
-
-**3. 浅克隆（要检索多个文件时）**
-
-```powershell
-git clone --depth 1 -b v2 https://github.com/linxlib/fw $env:TEMP/fw-docs
-```
-
-**4. 只取单个 raw 文件（最轻量）**
-
-```powershell
-$base = "https://raw.githubusercontent.com/linxlib/fw/v2"
-Invoke-WebRequest "$base/APP_AGENT.md" -OutFile "$env:TEMP/APP_AGENT.md"
-```
-
-### 版本必须对齐
-
-文档和代码同一个 tag。先看应用依赖的版本，再取同版本文档，否则文档描述的行为可能和实际依赖不一致：
-
-```powershell
-Select-String -Path go.mod -Pattern 'linxlib/fw'
-```
-
-取到 `v2.x.y` 就把上面的 `v2` 换成 `v2.x.y`；用模块缓存或本地检出时，同样优先选匹配版本的目录。
-
-如果拿不到网络也没有本地副本，**明确告诉用户"无法核对权威文档，以下按 skill 内的清单执行"**，不要凭空推断框架行为。
+- **不要去读 Go 模块缓存**（`GOPATH/pkg/mod/...` 一类的路径）。那在工作目录以外，且里面的版本不一定和应用实际依赖的版本一致
+- **不要为了文档创建源码检出或克隆目录**，除非工作目录下本来就有。需要临时文件时用当前环境的临时目录，读完清理
 
 ## 第 2 步：先摸清项目，别另起炉灶
 
@@ -405,7 +378,7 @@ FW_LOG_LEVEL=debug
 
 命令：
 
-```powershell
+```bash
 fw build      # 重新生成 .astp.json 与 fw_autoreg_gen.go 并构建
 go generate ./...   # 至少做到这一步
 ```
@@ -444,9 +417,9 @@ e.EnableConfigReload(time.Second)
 - [ ] 模型命名能表达绑定来源，字段带了 `example` / `default`
 - [ ] 配置改动已写进 `config/app.yaml`
 
-推荐命令：
+推荐命令（都是跨平台的，按你当前的 shell 执行）：
 
-```powershell
+```bash
 fw build
 go test ./...
 ```
