@@ -2,6 +2,8 @@
 
 FW is a lightweight Go API framework built on `fasthttp`, centered around annotation-driven routing, middleware binding, dependency injection, and automatic OpenAPI generation.
 
+FW requires Go 1.27 or newer, because it uses Go 1.27 method generics.
+
 Full guides:
 
 - Chinese: [doc_cn.md](./doc_cn.md)
@@ -16,6 +18,8 @@ Full guides:
 - Built-in request context wrapper, automatic method return responses, unified response envelope, and panic recovery
 - Automatic OpenAPI generation plus Swagger UI at `/docs`
 - `cmd/fw` CLI for project scaffolding, building, and component generation
+- Optional config hot reload, applied per top-level section
+- Generic controllers and generic methods, with real OpenAPI schemas inferred from type arguments
 
 ## Quick Start
 

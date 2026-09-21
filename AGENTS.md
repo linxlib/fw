@@ -5,7 +5,7 @@ This document describes the current project architecture and conventions for fut
 ## Module
 
 - Module path: `github.com/linxlib/fw/v2`
-- Go version: `1.25`
+- Go version: `1.27` (the module uses Go 1.27 method generics)
 - Runtime stack:
   - `github.com/valyala/fasthttp`
   - `github.com/fasthttp/router`
@@ -18,7 +18,7 @@ This document describes the current project architecture and conventions for fut
 - `annotation/`: normalized annotation extraction from `astp` output
 - `astp/`: in-repo AST parser library (enhanced annotation parsing)
 - `inject/`: in-repo dependency injection container (enhanced invoke resolver pipeline)
-- `config/`: yaml + env override configuration loader
+- `config/`: in-repo config library, YAML + env override, tag-driven loading, optional hot reload
 - `logger/`: colored console + plain file logger
 - `context/`: request context wrapper around `*fasthttp.RequestCtx`
 - `middleware/`: middleware protocol and chain execution model
@@ -34,7 +34,7 @@ Main type: `app.Engine`
 
 Key responsibilities:
 
-1. Load config
+1. Load config (optionally with hot reload via `Engine.EnableConfigReload`)
 2. Parse project metadata with `astp`
 3. Register controllers and annotations to routes
 4. Resolve middleware bindings
@@ -65,6 +65,7 @@ Registers two routes.
 - Same location (controller or method): same annotation name uses **last one wins**.
 - Across levels: method-level annotation overrides controller-level annotation when names are same.
 - Different middleware names are merged.
+- Across levels the same middleware runs only once, keeping the most specific level (method > controller > global).
 
 Execution order:
 
@@ -96,6 +97,14 @@ Supported annotation styles:
 - `@X value`
 - `@X(a,b)`
 - `@X(k=v, role=admin)`
+
+### Generic support
+
+- `astp.KindTypeParam` marks a `TypeRef` that refers to a type parameter.
+- `astp.RecvTypeArgs(q, owner, fn)` binds receiver type arguments from the embedded field chain.
+- `astp.InstantiateTypeRef` / `astp.InstantiateFields` / `astp.RebindTypeArgs` expand placeholders into real type refs.
+- Embedded methods are promoted to the outer type within the same package; cross-package embedding is not promoted yet.
+- A method with its own type parameters is parsed into `Func.Generic`, but its type argument cannot be inferred statically.
 
 ## Inject Enhancements
 
@@ -139,14 +148,23 @@ Set by `Engine.SetResponse(...)`.
 - Generated at startup when enabled
 - Output file defaults to `openapi.json`
 - Current generation includes path/method/operation id/basic 200 response
+- Generic return and body types are expanded through their type arguments into real schemas
+- `example` and `default` come from the `example:"..."` / `default:"..."` struct tags, with type-based placeholders otherwise
 
 ## Config
 
 Load order:
 
-1. Defaults
-2. YAML file (if provided)
-3. Env override (prefix `FW_`)
+1. `default` struct tag values
+2. YAML files, in list order, later files override earlier ones
+3. Env override (prefix `FW_`, derived as `FW_<SECTION>_<FIELD>`)
+
+Loading API:
+
+- `config.New(&config.Option{...})` then `LoadWithKey(key, target)`, `Load(target)`, or `LoadByTags(target)`
+- `key` is `""` for the whole document, a top-level section, or a dotted path such as `server.port`
+- Only `.yaml` files are accepted; `config/config.<env>.yaml` layers on top of `config/config.yaml`
+- `app.New(path)` loads the file into `app.EngineConfig`, which is the shape of the YAML document
 
 Example env keys:
 
@@ -154,6 +172,12 @@ Example env keys:
 - `FW_SERVER_PORT`
 - `FW_LOG_LEVEL`
 - `FW_OPENAPI_ENABLED`
+
+Hot reload:
+
+- Disabled by default, enabled with `Option.AutoReload`, `Config.StartAutoReload(interval)`, or `Engine.EnableConfigReload(interval)`
+- Each cycle hashes every top-level section and reloads only the changed ones, printing `config: reload detected, changed sections: [...]`
+- Routes and the listening address are fixed at `Build` / `ListenAndServe` time and are never rebuilt
 
 ## Current Example
 

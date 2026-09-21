@@ -10,6 +10,10 @@ FW 是一个面向 API 快速开发的轻量级 Go Web 框架。它基于 `fasth
 github.com/linxlib/fw/v2
 ```
 
+要求：
+
+- Go 1.27 及以上版本，模块使用了 Go 1.27 的方法泛型
+
 运行时依赖：
 
 - `github.com/valyala/fasthttp`
@@ -30,6 +34,10 @@ github.com/linxlib/fw/v2
 - Panic 恢复与请求日志
 - 自动生成 OpenAPI 文档和 Swagger UI
 - 提供 `cmd/fw` CLI 用于初始化项目、构建和生成代码骨架
+
+- 可选的配置热重载，按顶层 section 增量生效
+- 泛型 Controller 与泛型方法，并据类型实参推断出真实的 OpenAPI schema
+- OpenAPI 的 default 与 example 可来自模型字段上的 default / example struct tag
 
 ## 快速开始
 
@@ -78,7 +86,7 @@ go run .
 - `annotation/`：注解统一读取
 - `astp/`：AST 解析和自动注册代码生成
 - `inject/`：依赖注入容器和调用解析
-- `config/`：YAML 配置和环境变量覆盖
+- `config/`：自研配置库，YAML 文件加环境变量覆盖，tag 驱动加载，可选热重载
 - `logger/`：彩色控制台日志和文件日志
 - `context/`：请求上下文包装
 - `middleware/`：中间件接口和执行链
@@ -144,6 +152,11 @@ FW 使用 Go 注释中的注解，例如 `// @GET /users`、`// @Authorization(A
 - `@Response(...)`：指定哪个返回值用于 OpenAPI 响应结构推断
 - `@RawResponse`：让第一个非 `error` 返回值直接输出，不再包裹默认的 `code/message/data`
 
+框架还会读取以下 struct tag：
+
+- 模型字段上的 `example:"..."` 与 `default:"..."`，用于 OpenAPI 的示例值与默认值
+- 请求模型上的 `query:"..."`、`path:"..."`、`header:"..."`、`json:"..."`，用于参数绑定
+
 ## Controller 用法
 
 使用 `@Controller` 声明控制器，使用 `@Route` 定义基础路由。
@@ -185,6 +198,44 @@ func (c *UserController) GetUser(ctx context.Context, id string) error {
 // @POST /user_info
 func (c *UserController) ModifyUser(...) {}
 ```
+
+### 泛型 Controller
+
+Controller 可以内嵌已实例化的泛型基类。基类上的方法会被提升到外层 Controller，
+fw 同时会绑定类型实参，使 OpenAPI 展示真实的实体 schema 而不是空对象。
+
+```go
+package controllers
+
+import "github.com/your/mod/models"
+
+// BaseController 是泛型增删改查基类。
+type BaseController[T any] struct{}
+
+// List 返回一页 T。
+// @GET /
+func (c *BaseController[T]) List(ctx context.Context, query models.PageQuery) (models.PageSize[*T], error) {
+	return models.PageSize[*T]{}, nil
+}
+
+// Create 新增一条记录。形参类型是类型参数时按请求体绑定。
+// @POST /
+func (c *BaseController[T]) Create(ctx context.Context, entity *T) error {
+	return nil
+}
+
+// UserController 处理用户接口。
+// @Controller
+// @Route /api/v1/users
+type UserController struct {
+	BaseController[models.User]
+}
+```
+
+说明：
+
+- 内嵌方法提升仅限同包内，跨包内嵌暂不提升
+- 方法自身声明类型参数（如 `func (c *C) [T any] M()`）可以被解析，但静态阶段无法推断实参，其 OpenAPI schema 仍为泛型占位
 
 ## Service 用法
 
@@ -270,6 +321,7 @@ func (AuthMiddleware) Handle(ctx context.Context, args middleware.AnnotationArgs
 - 同一层级上，同名注解后者覆盖前者
 - 方法级中间件会覆盖同名控制器级中间件
 - 不同名字的中间件会合并执行
+- 同一中间件在多层绑定时只执行一次，保留最具体的一层，即方法级优先于控制器级、控制器级优先于全局
 
 ### 忽略中间件
 
@@ -374,6 +426,12 @@ FW 会自动推断参数来源，同时也支持通过注解和标签显式指�
 3. 否则，如果参数名命中路由参数，例如 `:id`，则视为路径参数
 4. 否则，如果是已解析出的结构体类型，默认从 body 绑定
 5. 其他基础类型默认从 query 绑定
+
+### 缺失与多余值
+
+- query、header、body 字段缺失时保留目标字段的零值，因此可选的筛选条件不需要写成指针
+- 路由里声明了路径参数但处理方法没写对应形参（或反过来）会直接报错，不会静默绑一个空值
+- 每个参数独立绑定，两个相同基础类型的参数不会共享同一个解析结果
 
 ### 基础类型绑定
 
@@ -662,15 +720,25 @@ e.SetResponse(customFormatter, customEncoder)
 
 如果方法同时标记了 `@RawResponse`，那么 OpenAPI 会直接把选中的返回值作为顶层 `200` 响应结构，而不是再放到 `data` 字段下面。
 
+### schema 细节
+
+- 泛型的返回值与请求体会按类型实参展开，因此 `PageSize[*T]` 在 `T` 被内嵌的 Controller 绑定后会变成真实的实体 schema
+- 字段上的 `example:"..."` 与 `default:"..."` 会写进 schema 的 example 与 default，且优先于按类型给的占位值
+- 未标注时按类型给占位值：字符串 `"string"`、整数 `1`、浮点 `1.5`、布尔 `true`，default 取该类型的零值
+- 枚举字段用第一个取值作为示例值
+- 响应外壳自身也带示例值：code `0`、message `"ok"`、trace_id `"trace-id"`
+
 ## 配置
 
-配置加载顺序：
+FW 在 `config/` 下提供了自研配置库。配置只来自两个来源：YAML 文件与环境变量。
 
-1. 框架默认值
-2. YAML 文件
-3. `FW_` 前缀环境变量
+加载顺序，优先级从低到高：
 
-配置示例：
+1. `default` struct tag 给出的缺省值
+2. YAML 文件，按列表顺序叠加，后读的覆盖先读的
+3. 环境变量
+
+示例配置，这里为 `config/app.yaml`：
 
 ```yaml
 project_dir: .
@@ -688,18 +756,38 @@ log:
 
 recovery:
   enabled: true
-  return_stack_to_body: true
+  return_stack_to_body: false
 
 openapi:
   enabled: true
   output: openapi.json
-  title: "FW API"
+  title: "fw API"
   version: "1.0.0"
 
 middlewares:
   authorization:
     api-key: xxxx
 ```
+
+### 直接使用配置库
+
+`app.New(path)` 会把配置文件加载进 `app.EngineConfig`。自己使用 `config/` 时：
+
+```go
+c := config.New(&config.Option{Files: []string{"config/app.yaml"}})
+
+var opt ServerOpt
+_ = c.LoadWithKey("server", &opt)      // 顶层 section
+_ = c.LoadWithKey("server.port", &port) // 点号路径，可注入到任意可寻址变量
+_ = c.LoadByTags(&opt)                 // 按 inject:"<section>" tag 注入
+```
+
+规则：
+
+- 只接受 `.yaml` 文件，传 `.yml` 或 `.json` 会直接报错
+- 若存在 `config/config.<env>.yaml`，会叠加在 `config/config.yaml` 之后；`<env>` 依次取 `Option.Environment`、`CONFIG_ENV`、`go test` 场景下的 `test`，否则 `development`
+- section 缺失时保持目标现状不变，因此 `default` 值不会丢
+- 支持的 struct tag：`default`、`required:"true"`、`inject`（`-` 或 `_` 跳过该字段）、`env`，以及内嵌结构体的 `anonymous:"true"`
 
 ### 常用环境变量覆盖
 
@@ -710,23 +798,51 @@ FW_LOG_LEVEL=debug
 FW_OPENAPI_ENABLED=false
 ```
 
-### 用环境变量覆盖中间件配置
+变量名按 `<PREFIX>_<SECTION>_<FIELD>` 派生。显式的 `env:"NAME"` tag 优先，`ENVPrefix: "-"` 可关闭前缀派生。
 
-中间件配置也支持环境变量覆盖。
+### 中间件配置
 
-例如：
+中间件配置来自 `middlewares:` section，按中间件名小写匹配。没有对应段时得到的是空 `config.Section`，因此中间件无需判空。
 
-```bash
-FW_MIDDLEWARES_AUTHORIZATION_API_KEY=secret
+```go
+type AuthorizationMiddleware struct {
+	Config *config.Section `inject:""`
+}
+
+func (m *AuthorizationMiddleware) Handle(ctx context.Context, _ middleware.AnnotationArgs, next middleware.Handler) error {
+	if m.Config.Get("api-key") == "" {
+		return ctx.Respond(fasthttp.StatusUnauthorized, 40100, "missing api key", nil)
+	}
+	return next(ctx)
+}
 ```
 
-等价于：
+`config.Section` 是 `map[string]any`，key 大小写不敏感，只提供 `Get` 与 `Has`。环境变量不会进入 map 类型的 section，因此中间件配置只能来自 YAML。
 
-```yaml
-middlewares:
-  authorization:
-    api-key: secret
+### 热重载
+
+热重载默认关闭，有三种开启方式：
+
+```go
+// 通过 Option
+c := config.New(&config.Option{AutoReload: true, AutoReloadInterval: time.Second})
+
+// 在已有的 config 对象上随时开启
+c.StartAutoReload(time.Second)
+
+// 通过引擎，在 app.New 之后、ListenAndServe 之前调用
+e.EnableConfigReload(time.Second)
 ```
+
+行为说明：
+
+- 每个周期计算各顶层 section 的内容哈希，只重载内容发生变化的 section
+- 文件未变化时直接跳过，不解码任何内容
+- 检测到需要重载时会在标准输出打印 `config: reload detected, changed sections: [...]`，`Silent: true` 时不打印
+- `Option.AutoReloadCallback` 在配置锁外收到每个变化的 key 及其更新后的目标
+- 单个目标重载失败时保留其旧值，其余目标不受影响
+- Linux 上用 inotify 即时触发，其他平台依赖轮询间隔
+- 路由表与监听地址在 `Build` 与 `ListenAndServe` 时已确定，因此改 `server.port` 不会切换监听端口
 
 ## Recovery 和日志
 
@@ -746,8 +862,10 @@ middlewares:
 ```yaml
 recovery:
   enabled: true
-  return_stack_to_body: true
+  return_stack_to_body: false
 ```
+
+`return_stack_to_body` 默认为 `false`，panic 响应体只返回错误外壳。开发期需要把堆栈带回响应体时再设为 `true`。
 
 ### 请求日志
 
@@ -884,6 +1002,8 @@ fw completion zsh
 5. 开发时使用 `go run .`
 6. 打开 `/docs` 查看自动生成的接口文档
 7. 交付前执行 `go test ./...`
+
+8. 需要配置热重载时，在 `app.New` 之后调用 `e.EnableConfigReload(time.Second)`
 
 ## 一个包含多种能力的示例
 

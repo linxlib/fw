@@ -13,6 +13,8 @@ FW is a lightweight Go web framework for building APIs quickly with annotation-s
 - Unified JSON response envelope
 - OpenAPI generation with Swagger UI
 - `cmd/fw` CLI for scaffolding and builds
+- Optional config hot reload, applied per top-level section
+- Generic controllers and methods, with real OpenAPI schemas inferred from type arguments
 
 ## Install
 

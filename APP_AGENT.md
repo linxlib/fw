@@ -103,6 +103,16 @@ func main() {
 }
 ```
 
+If the app wants live config changes, enable hot reload between `app.New` and `ListenAndServe`:
+
+```go
+e.EnableConfigReload(time.Second)
+```
+
+It reloads only the top-level sections whose content changed and prints
+`config: reload detected, changed sections: [...]` on standard output. Routes and the
+listening address are fixed at startup, so a changed `server.port` does not move the listener.
+
 Important:
 
 - if the project embeds `.astp.json`, keep it up to date
@@ -285,6 +295,11 @@ Use explicit model naming to help the framework infer binding source:
 
 If needed, add type annotations such as `@Body` or `@Query`.
 
+Notes on binding:
+
+- a missing query, header, or body field keeps the zero value, so optional filters do not need pointer types
+- each parameter is bound on its own, so two parameters of the same primitive type never share a value
+
 ## Middleware
 
 Use middlewares for cross-cutting behavior, not business logic.
@@ -381,6 +396,11 @@ Recommendation:
 
 Application config usually lives in `config/app.yaml`.
 
+Config sections map to struct fields through `inject` tags, and `default` tags hold the
+fallback value, so a section that is absent from the YAML file still has a sane default.
+Environment overrides are derived as `FW_<SECTION>_<FIELD>`, and an explicit `env:"NAME"` tag
+wins over the derived name.
+
 Typical examples:
 
 - server host and port
@@ -462,6 +482,11 @@ When adding endpoints, think about:
 - security middleware
 
 If an endpoint returns a meaningful payload, make sure the handler signature helps OpenAPI infer the schema clearly.
+
+For models, annotate fields with `example:"..."` and `default:"..."` so the generated schema
+carries real values instead of type placeholders. Generic base controllers work too: embed an
+instantiated base such as `BaseController[models.User]`, and the promoted methods get real
+schemas for `T`.
 
 ## SSE And WebSocket
 

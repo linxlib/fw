@@ -10,6 +10,10 @@ Module path:
 github.com/linxlib/fw/v2
 ```
 
+Requirements:
+
+- Go 1.27 or newer, because the module uses Go 1.27 method generics
+
 Runtime dependencies:
 
 - `github.com/valyala/fasthttp`
@@ -30,6 +34,9 @@ Runtime dependencies:
 - Panic recovery and request logging
 - Automatic OpenAPI document generation and Swagger UI
 - `cmd/fw` CLI for project creation, build flow, and code scaffolding
+- Optional config hot reload, applied per top-level section
+- Generic controllers and generic methods, with real OpenAPI schemas inferred from type arguments
+- OpenAPI `default` and `example` values read from `default` / `example` struct tags
 
 ## Quick Start
 
@@ -78,7 +85,7 @@ Important: the scaffolded project embeds `.astp.json`, so you should run `fw bui
 - `annotation/`: normalized annotation access
 - `astp/`: AST parser and auto-registration generator
 - `inject/`: dependency injection container and invoke pipeline
-- `config/`: YAML config plus environment overrides
+- `config/`: in-repo config library, YAML files plus environment overrides, tag-driven loading, optional hot reload
 - `logger/`: colored console logger and optional file output
 - `context/`: request context wrapper
 - `middleware/`: middleware interfaces and chain execution
@@ -144,6 +151,11 @@ Handler-specific response annotations used by the framework include:
 - `@Response(...)`: choose which return value drives the OpenAPI response schema
 - `@RawResponse`: write the first non-`error` return value directly without the default `code/message/data` envelope
 
+Struct tags that FW reads outside of annotations:
+
+- `example:"..."` and `default:"..."` on model fields, used for OpenAPI examples and defaults
+- `query:"..."`, `path:"..."`, `header:"..."`, `json:"..."` on request models, used for parameter binding
+
 ## Controller Usage
 
 Define a controller type with `@Controller` and optionally `@Route`.
@@ -185,6 +197,45 @@ Example:
 // @POST /user_info
 func (c *UserController) ModifyUser(...) {}
 ```
+
+### Generic controllers
+
+A controller can embed an instantiated generic base type. Methods of the base type are
+promoted to the outer controller, and FW binds the type argument so OpenAPI shows the real
+entity schema instead of an empty object.
+
+```go
+package controllers
+
+import "github.com/your/mod/models"
+
+// BaseController is a generic CRUD base.
+type BaseController[T any] struct{}
+
+// List returns a page of T.
+// @GET /
+func (c *BaseController[T]) List(ctx context.Context, query models.PageQuery) (models.PageSize[*T], error) {
+	return models.PageSize[*T]{}, nil
+}
+
+// Create stores one entity. A parameter whose type is a type parameter is bound as body.
+// @POST /
+func (c *BaseController[T]) Create(ctx context.Context, entity *T) error {
+	return nil
+}
+
+// UserController handles user APIs.
+// @Controller
+// @Route /api/v1/users
+type UserController struct {
+	BaseController[models.User]
+}
+```
+
+Notes:
+
+- Embedded method promotion works within the same package; cross-package embedding is not promoted yet
+- A method that declares its own type parameters, such as `func (c *C) [T any] M()`, is parsed, but FW cannot infer the type argument statically, so its OpenAPI schema stays generic
 
 ## Service Usage
 
@@ -270,6 +321,7 @@ Execution is deterministic:
 - At the same level, the last annotation with the same name wins
 - Method-level middleware overrides controller-level middleware with the same name
 - Different middleware names are merged
+- The same middleware bound at several levels runs only once, keeping the most specific level, so method beats controller and controller beats global
 
 ### Ignore middleware
 
@@ -374,6 +426,12 @@ For each handler parameter:
 3. Otherwise, if the parameter name matches a route param like `:id`, it is treated as a path param
 4. Otherwise, resolved struct types default to body binding
 5. Other primitive values default to query binding
+
+### Missing and extra values
+
+- A missing query, header, or body field keeps the zero value of the target field, so optional filters need no pointer types
+- A path parameter that is declared in the route but missing from the handler signature, or the other way around, fails loudly instead of silently binding an empty value
+- Values are bound per parameter, so two parameters of the same primitive type never share one parsed value
 
 ### Primitive binding
 
@@ -662,15 +720,26 @@ Positive indexes are 1-based.
 
 If the handler also has `@RawResponse`, OpenAPI uses the selected return value as the top-level `200` response schema directly instead of wrapping it under `data`.
 
+### Schema details
+
+- Generic return and body types are expanded through their type arguments, so `PageSize[*T]` becomes the real entity schema once `T` is bound by the embedding controller
+- `example:"..."` and `default:"..."` struct tags fill `example` and `default` in the schema, and they win over the type-based placeholder
+- Without tags, FW fills placeholders by type: strings become `"string"`, integers `1`, floats `1.5`, booleans `true`, and defaults become the zero value of the type
+- Enum fields use their first value as the example
+- The response envelope itself carries `code` `0`, `message` `"ok"`, and `trace_id` `"trace-id"` as example values
+
 ## Configuration
 
-Configuration load order:
+FW ships its own config library in `config/`. Configuration comes from exactly two sources:
+a YAML file and environment variables.
 
-1. Built-in defaults
-2. YAML file
-3. Environment variables with prefix `FW_`
+Load order, from lowest to highest priority:
 
-Example config:
+1. `default` struct tag values
+2. YAML files, in list order, where later files override earlier ones
+3. Environment variables
+
+Example config, here `config/app.yaml`:
 
 ```yaml
 project_dir: .
@@ -688,18 +757,38 @@ log:
 
 recovery:
   enabled: true
-  return_stack_to_body: true
+  return_stack_to_body: false
 
 openapi:
   enabled: true
   output: openapi.json
-  title: "FW API"
+  title: "fw API"
   version: "1.0.0"
 
 middlewares:
   authorization:
     api-key: xxxx
 ```
+
+### Loading config directly
+
+`app.New(path)` loads the file into `app.EngineConfig`. When you use `config/` yourself:
+
+```go
+c := config.New(&config.Option{Files: []string{"config/app.yaml"}})
+
+var opt ServerOpt
+_ = c.LoadWithKey("server", &opt)      // top-level section
+_ = c.LoadWithKey("server.port", &port) // dotted path, any addressable target
+_ = c.LoadByTags(&opt)                 // driven by `inject:"<section>"` tags
+```
+
+Rules:
+
+- Only `.yaml` files are accepted, passing `.yml` or `.json` returns an error
+- When `config/config.<env>.yaml` exists it is layered on top of `config/config.yaml`, where `<env>` comes from `Option.Environment`, then `CONFIG_ENV`, then `test` inside `go test`, otherwise `development`
+- A missing section leaves the target untouched, so `default` values survive
+- Supported struct tags are `default`, `required:"true"`, `inject` where `-` or `_` skips a field, `env`, and `anonymous:"true"` for embedded structs
 
 ### Common environment overrides
 
@@ -710,23 +799,56 @@ FW_LOG_LEVEL=debug
 FW_OPENAPI_ENABLED=false
 ```
 
-### Middleware config from environment
+Names are derived as `<PREFIX>_<SECTION>_<FIELD>`. An explicit `env:"NAME"` tag wins, and
+`ENVPrefix: "-"` turns prefix derivation off.
 
-Middleware sections can also be overridden by environment variables.
+### Middleware config
 
-Example:
+Middleware settings are read from the `middlewares:` section and matched by the lowercase
+middleware name. A missing section produces an empty `config.Section`, so middleware never
+needs a nil check.
 
-```bash
-FW_MIDDLEWARES_AUTHORIZATION_API_KEY=secret
+```go
+type AuthorizationMiddleware struct {
+	Config *config.Section `inject:""`
+}
+
+func (m *AuthorizationMiddleware) Handle(ctx context.Context, _ middleware.AnnotationArgs, next middleware.Handler) error {
+	if m.Config.Get("api-key") == "" {
+		return ctx.Respond(fasthttp.StatusUnauthorized, 40100, "missing api key", nil)
+	}
+	return next(ctx)
+}
 ```
 
-This maps to:
+`config.Section` is a `map[string]any` with case-insensitive keys and only `Get` and `Has`.
+Environment variables do not reach map-typed sections, so middleware configuration comes from
+YAML only.
 
-```yaml
-middlewares:
-  authorization:
-    api-key: secret
+### Hot reload
+
+Hot reload is disabled by default. There are three ways to turn it on:
+
+```go
+// through the option
+c := config.New(&config.Option{AutoReload: true, AutoReloadInterval: time.Second})
+
+// on an existing config object, any time
+c.StartAutoReload(time.Second)
+
+// through the engine, call after app.New and before ListenAndServe
+e.EnableConfigReload(time.Second)
 ```
+
+Behavior:
+
+- Each cycle hashes every top-level section and reloads only the sections whose content changed
+- Unchanged files cost nothing, because the cycle exits before any decoding
+- When a reload is detected, FW prints `config: reload detected, changed sections: [...]` on standard output, and `Silent: true` turns that off
+- `Option.AutoReloadCallback` receives each changed key with its updated target, outside the config lock
+- A single target that fails to reload keeps its previous value, other targets still reload
+- On Linux, inotify triggers a reload immediately, other platforms rely on the polling interval
+- Routes and the listening address are fixed at `Build` and `ListenAndServe` time, so a changed `server.port` does not move the listener
 
 ## Recovery and Logging
 
@@ -746,8 +868,11 @@ Config:
 ```yaml
 recovery:
   enabled: true
-  return_stack_to_body: true
+  return_stack_to_body: false
 ```
+
+`return_stack_to_body` defaults to `false`, so a panic response body carries the error envelope
+only. Set it to `true` when you want the stack in the body during development.
 
 ### Request logging
 
@@ -884,6 +1009,7 @@ fw completion zsh
 5. Run `go run .` during development
 6. Open `/docs` to inspect the generated API documentation
 7. Run `go test ./...` before shipping changes
+8. If you want live config changes, call `e.EnableConfigReload(time.Second)` after `app.New`
 
 ## Example Controller With Multiple Features
 

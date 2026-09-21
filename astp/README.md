@@ -6,6 +6,8 @@ Golang AST 语法树解析库，用于解析 Go 源代码生成结构化描述�
 
 - 解析结构体、接口、函数、变量、常量、枚举
 - 支持泛型类型
+- 支持 Go 1.27 方法泛型（方法自身声明的类型参数）
+- 支持内嵌字段的方法提升，以及泛型实参绑定与展开
 - 解析 struct tag
 - 解析注释中的 `@xxx` 注解
 - 支持类型引用解析
@@ -356,3 +358,30 @@ type EnumValue struct {
 3. **类型解析**: `TypeRef` 只包含类型引用信息，使用 `ResolveTypeRef()` 可获取完整类型定义
 
 4. **循环引用**: 类型之间的引用通过 `TypeRef` 实现，避免循环引用问题
+
+## 泛型支持
+
+### 数据形态
+
+- `Type.Generic` 与 `Func.Generic` 是 `*GenericSpec`，里面是该方法/类型自身声明的类型参数
+- `Func.Recv.Generic` 是 `*GenericArg`，保存接收者结构体的类型实参，例如 `BaseController[models.User]`
+- 签名里引用类型参数的位置，`TypeRef.Kind` 为 `KindTypeParam`（`"typeparam"`），此时 `ResolveTypeRef()` 返回 nil，避免误解析到同名具名类型
+- 约束支持 `any`、`comparable`、`~T`、`A|B`、`(A|B)` 与 `interface{...}`，`~` 不落库
+
+### 内嵌方法提升
+
+同包内嵌字段的方法会被提升到外层结构体，外层显式方法遮蔽被提升的方法。提升方法与原方法共享
+同一个 `*Func`，`Recv` 仍指向嵌入类型。跨包嵌入暂不提升。
+
+### 泛型实参绑定
+
+```go
+bind := astp.RecvTypeArgs(q, owner, fn)     // 从嵌入字段链还原 T -> models.User
+ref := astp.InstantiateTypeRef(sigRef, bind) // 把签名里的 T 替换成真实类型
+fields := astp.InstantiateFields(t.Fields, bind)
+```
+
+- `TypeArgBinding` 是 `map[string]*TypeRef`，key 为类型参数名
+- `InstantiateTypeRef` 按名递归替换并保留外层形状，`*T` 替换后仍是指针，深度上限 8 以防自引用爆栈
+- `RebindTypeArgs` 处理同名不同作用域的情况，例如 `Base.T` 与 `PageSize.T`
+- 方法自身声明的类型参数无法静态推断实参，`RecvTypeArgs` 对这类方法返回 nil
