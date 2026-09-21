@@ -19,7 +19,10 @@ type RouteInfo struct {
 	Parameters           []Parameter
 	RequestBody          *RequestBody
 	ResponseSchema       *Schema
-	Security             []SecurityRequirement
+	// ResponseExample 是响应的完整示例值(整个 body). 留空时 openapi 层用
+	// ResponseSchema 自带的 Example 兜底.
+	ResponseExample any
+	Security        []SecurityRequirement
 }
 
 // SecurityRequirement maps a security scheme name to its scopes (empty for most cases).
@@ -87,6 +90,8 @@ type RequestBody struct {
 
 type MediaType struct {
 	Schema Schema `json:"schema"`
+	// Example 是该 media type 的完整示例值(整个 body), 优先级高于各字段自己的 example.
+	Example any `json:"example,omitempty"`
 }
 
 type Schema struct {
@@ -98,6 +103,12 @@ type Schema struct {
 	Properties           map[string]Schema `json:"properties,omitempty"`
 	Items                *Schema           `json:"items,omitempty"`
 	AdditionalProperties *Schema           `json:"additionalProperties,omitempty"`
+	// Default 是该字段的默认值. 优先取 model 字段上 default tag 的显式标注,
+	// 未标注时按类型给出零值(string -> "", 数值 -> 0, bool -> false).
+	Default any `json:"default,omitempty"`
+	// Example 是该字段的示例值. 优先取 model 字段上 example tag 的显式标注,
+	// 未标注时按类型给出占位示例(string -> "string", 整数 -> 1, 浮点 -> 1.5, bool -> true).
+	Example any `json:"example,omitempty"`
 }
 
 type ResponseEntry struct {
@@ -146,7 +157,10 @@ func Generate(outputPath string, title string, version string, routes []RouteInf
 		resp := ResponseEntry{Description: "OK"}
 		if route.ResponseSchema != nil {
 			resp.Content = map[string]MediaType{
-				"application/json": {Schema: *route.ResponseSchema},
+				"application/json": {
+					Schema:  *route.ResponseSchema,
+					Example: responseExample(route),
+				},
 			}
 		}
 		summary := strings.TrimSpace(route.OperationDescription)
@@ -218,4 +232,16 @@ func toOpenAPIPath(path string) string {
 		out = "/" + out
 	}
 	return out
+}
+
+// responseExample 取出响应的完整示例值: 优先 RouteInfo.ResponseExample,
+// 否则退回 schema 自身的 Example(顶层 envelope 已带上).
+func responseExample(route RouteInfo) any {
+	if route.ResponseExample != nil {
+		return route.ResponseExample
+	}
+	if route.ResponseSchema != nil {
+		return route.ResponseSchema.Example
+	}
+	return nil
 }

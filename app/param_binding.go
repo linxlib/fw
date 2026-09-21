@@ -24,7 +24,7 @@ type ParamHint struct {
 	Source BindSource
 }
 
-func buildParamHints(q *astp.Query, method *astp.Func, pathParamSet map[string]struct{}) map[string]ParamHint {
+func buildParamHints(q *astp.Query, method *astp.Func, pathParamSet map[string]struct{}, typeArgs astp.TypeArgBinding) map[string]ParamHint {
 	typeParams := typeParamNames(method)
 	hints := make(map[string]ParamHint)
 	for _, p := range method.Params {
@@ -173,7 +173,7 @@ func isContextParam(t *astp.TypeRef) bool {
 	return false
 }
 
-func buildOpenAPIForMethod(q *astp.Query, method *astp.Func, hints map[string]ParamHint) ([]openapi.Parameter, *openapi.RequestBody) {
+func buildOpenAPIForMethod(q *astp.Query, method *astp.Func, hints map[string]ParamHint, typeArgs astp.TypeArgBinding) ([]openapi.Parameter, *openapi.RequestBody) {
 	var params []openapi.Parameter
 	var bodySchema *openapi.Schema
 	for _, p := range method.Params {
@@ -184,12 +184,25 @@ func buildOpenAPIForMethod(q *astp.Query, method *astp.Func, hints map[string]Pa
 		if !ok {
 			continue
 		}
-		resolved := q.ResolveParamType(p)
-		schema := schemaFromTypeRef(q, p.Type)
+
+		// 泛型占位参数(如 entity *T)在静态阶段解析不到具体类型, 先按实参绑定实例化.
+		pType := p.Type
+		if len(typeArgs) > 0 {
+			pType = astp.InstantiateTypeRef(p.Type, typeArgs)
+		}
+		resolved := q.ResolveTypeRef(pType)
+		schema := schemaFromTypeRef(q, pType, typeArgs)
+
 		if resolved != nil && resolved.Kind == astp.KindStruct {
+			// 进入被实例化类型时, 用它自身的形参与传入实参重建作用域.
+			inner := innerBinding(q, resolved, pType)
+			fields := resolved.Fields
+			if len(inner) > 0 {
+				fields = astp.InstantiateFields(resolved.Fields, inner)
+			}
 			switch hint.Source {
 			case BindQuery, BindPath, BindHeader:
-				for _, f := range resolved.Fields {
+				for _, f := range fields {
 					if f == nil || f.Type == nil {
 						continue
 					}
@@ -202,15 +215,16 @@ func buildOpenAPIForMethod(q *astp.Query, method *astp.Func, hints map[string]Pa
 						In:          string(hint.Source),
 						Required:    hint.Source == BindPath || isFieldRequired(f, hint.Source),
 						Description: fieldDescription(f),
-						Schema:      schemaFromTypeRef(q, f.Type),
+						Schema:      schemaFromField(q, f, inner),
 					})
 				}
 			case BindBody:
-				s := schemaFromStructType(q, resolved)
+				s := schemaFromStructType(q, resolved, inner)
 				bodySchema = &s
 			}
 			continue
 		}
+
 		switch hint.Source {
 		case BindBody:
 			bodySchema = &schema
@@ -230,9 +244,34 @@ func buildOpenAPIForMethod(q *astp.Query, method *astp.Func, hints map[string]Pa
 	return params, &openapi.RequestBody{
 		Required: true,
 		Content: map[string]openapi.MediaType{
-			"application/json": {Schema: *bodySchema},
+			"application/json": {
+				Schema:  *bodySchema,
+				Example: ExampleFromSchema(*bodySchema, 0),
+			},
 		},
 	}
+}
+
+// innerBinding 进入一个被实例化的泛型类型时, 用它自身的形参与 ref 上的实参重建绑定.
+//
+// 这是「同名不同作用域」的关键: Base.T 与 PageSize.T 是两个独立的类型参数,
+// 不重建就会把外层的绑定误用到内层作用域.
+func innerBinding(q *astp.Query, t *astp.Type, ref *astp.TypeRef) astp.TypeArgBinding {
+	if q == nil || t == nil || ref == nil || ref.Generic == nil || len(ref.Generic.Args) == 0 {
+		return nil
+	}
+	return astp.RebindTypeArgs(t, ref.Generic.Args)
+}
+
+// schemaFromField 由字段生成 schema, 并按需在字段类型内部重建泛型作用域.
+// 同时应用字段上的 example / default tag, 让 query/path/header 参数也带上文档标注.
+func schemaFromField(q *astp.Query, f *astp.Field, bind astp.TypeArgBinding) openapi.Schema {
+	if f == nil || f.Type == nil {
+		return openapi.Schema{Type: "string"}
+	}
+	s := schemaFromTypeRef(q, f.Type, bind)
+	applyFieldTags(f, &s)
+	return s
 }
 
 func fieldNameForSource(f *astp.Field, source BindSource) string {
@@ -248,6 +287,7 @@ func fieldNameForSource(f *astp.Field, source BindSource) string {
 			return strings.Split(v, ",")[0]
 		}
 	}
+
 	return lowerFirst(f.Name)
 }
 
@@ -258,11 +298,15 @@ func lowerFirst(s string) string {
 	return strings.ToLower(s[:1]) + s[1:]
 }
 
-func schemaFromStructType(q *astp.Query, t *astp.Type) openapi.Schema {
+func schemaFromStructType(q *astp.Query, t *astp.Type, bind astp.TypeArgBinding) openapi.Schema {
 	props := make(map[string]openapi.Schema)
 	var required []string
 	if t != nil {
-		for _, f := range t.Fields {
+		fields := t.Fields
+		if len(bind) > 0 {
+			fields = astp.InstantiateFields(t.Fields, bind)
+		}
+		for _, f := range fields {
 			if f == nil || f.Type == nil || f.Name == "" {
 				continue
 			}
@@ -270,8 +314,16 @@ func schemaFromStructType(q *astp.Query, t *astp.Type) openapi.Schema {
 			if name == "" {
 				continue
 			}
-			s := schemaFromTypeRef(q, f.Type)
+			// 字段自身(或其嵌套位置)是被实例化的泛型类型时, 用该类型自身的形参与
+			// 实际实参重建一层作用域. 需要下钻查找: 泛型实参可能在顶层(PageSize[*T]),
+			// 也可能藏在切片元素([]T)或 map 值(map[string]PageSize[T])里.
+			fieldBind := bind
+			if inner := nestedBinding(q, f.Type, bind); len(inner) > 0 {
+				fieldBind = inner
+			}
+			s := schemaFromTypeRef(q, f.Type, fieldBind)
 			s.Description = fieldDescription(f)
+			applyFieldTags(f, &s)
 			props[name] = s
 			if isFieldRequired(f, BindBody) {
 				required = append(required, name)
@@ -282,23 +334,27 @@ func schemaFromStructType(q *astp.Query, t *astp.Type) openapi.Schema {
 	return openapi.Schema{Type: "object", Properties: props, Required: required}
 }
 
-func schemaFromTypeRef(q *astp.Query, ref *astp.TypeRef) openapi.Schema {
+func schemaFromTypeRef(q *astp.Query, ref *astp.TypeRef, bind astp.TypeArgBinding) openapi.Schema {
 	if ref == nil {
 		return openapi.Schema{Type: "string"}
 	}
 	switch ref.Kind {
 	case astp.KindSlice:
-		item := schemaFromTypeRef(q, ref.ElemType)
+		item := schemaFromTypeRef(q, ref.ElemType, bind)
 		return openapi.Schema{Type: "array", Items: &item}
 	case astp.KindMap:
-		val := schemaFromTypeRef(q, ref.ElemType)
+		val := schemaFromTypeRef(q, ref.ElemType, bind)
 		return openapi.Schema{Type: "object", AdditionalProperties: &val}
 	case astp.KindStruct, astp.KindPointer:
 		if q != nil {
 			if t := q.ResolveTypeRef(ref); t != nil {
 				if t.Kind == astp.KindStruct {
-					s := schemaFromStructType(q, t)
-					return s
+					// 被实例化的泛型类型: 用它自身的形参与 ref 上的实参重建作用域.
+					inner := innerBinding(q, t, ref)
+					if len(inner) == 0 {
+						inner = bind
+					}
+					return schemaFromStructType(q, t, inner)
 				}
 				if t.Kind == astp.KindEnum {
 					if e := q.FindEnum(t.Name); e != nil {
@@ -307,6 +363,7 @@ func schemaFromTypeRef(q *astp.Query, ref *astp.TypeRef) openapi.Schema {
 				}
 			}
 		}
+		// 解析不到具体类型(跨包类型, 或未推断出的泛型占位): 保持对象占位.
 		return openapi.Schema{Type: "object"}
 	default:
 		if q != nil {
@@ -321,7 +378,7 @@ func schemaFromTypeRef(q *astp.Query, ref *astp.TypeRef) openapi.Schema {
 func schemaFromEnum(q *astp.Query, e *astp.Enum) openapi.Schema {
 	base := openapi.Schema{Type: "string"}
 	if e != nil && e.Type != nil {
-		base = schemaFromTypeRef(q, e.Type)
+		base = schemaFromTypeRef(q, e.Type, nil)
 	}
 	if e == nil {
 		return base
@@ -341,7 +398,7 @@ func schemaFromEnum(q *astp.Query, e *astp.Enum) openapi.Schema {
 	return base
 }
 
-func responseSchemaForMethod(q *astp.Query, method *astp.Func) *openapi.Schema {
+func responseSchemaForMethod(q *astp.Query, method *astp.Func, typeArgs astp.TypeArgBinding) *openapi.Schema {
 	if method == nil {
 		return nil
 	}
@@ -351,7 +408,7 @@ func responseSchemaForMethod(q *astp.Query, method *astp.Func) *openapi.Schema {
 		if idx >= 0 && idx < len(method.Results) {
 			r := method.Results[idx]
 			if r != nil && r.Type != nil && !isErrorTypeRef(r.Type) {
-				s := schemaFromTypeRef(q, r.Type)
+				s := schemaFromTypeRef(q, instantiateResult(r.Type, typeArgs), typeArgs)
 				if rawResponse {
 					return &s
 				}
@@ -369,7 +426,7 @@ func responseSchemaForMethod(q *astp.Query, method *astp.Func) *openapi.Schema {
 		if isErrorTypeRef(r.Type) {
 			continue
 		}
-		s := schemaFromTypeRef(q, r.Type)
+		s := schemaFromTypeRef(q, instantiateResult(r.Type, typeArgs), typeArgs)
 		if rawResponse {
 			return &s
 		}
@@ -380,6 +437,11 @@ func responseSchemaForMethod(q *astp.Query, method *astp.Func) *openapi.Schema {
 }
 
 func envelopeResponseSchema(data openapi.Schema) openapi.Schema {
+	code := openapi.Schema{Type: "integer", Format: "int32", Default: 0, Example: 0}
+	message := openapi.Schema{Type: "string", Default: "", Example: "ok"}
+	trace := openapi.Schema{Type: "string", Default: "", Example: "trace-id"}
+	data.Default = DefaultFromSchema(data, 0)
+	data.Example = ExampleFromSchema(data, 0)
 	return openapi.Schema{
 		Type: "object",
 		Required: []string{
@@ -387,17 +449,22 @@ func envelopeResponseSchema(data openapi.Schema) openapi.Schema {
 			"message",
 		},
 		Properties: map[string]openapi.Schema{
-			"code": {
-				Type:   "integer",
-				Format: "int32",
-			},
-			"message": {
-				Type: "string",
-			},
-			"data": data,
-			"trace_id": {
-				Type: "string",
-			},
+			"code":     code,
+			"message":  message,
+			"data":     data,
+			"trace_id": trace,
+		},
+		Default: map[string]any{
+			"code":     0,
+			"message":  "ok",
+			"data":     data.Default,
+			"trace_id": "",
+		},
+		Example: map[string]any{
+			"code":     0,
+			"message":  "ok",
+			"data":     data.Example,
+			"trace_id": "trace-id",
 		},
 	}
 }
@@ -593,4 +660,66 @@ func isPointerTypeRef(ref *astp.TypeRef) bool {
 		return true
 	}
 	return false
+}
+
+// nestedBinding 在字段类型里下钻查找「被实例化的泛型类型」, 并返回重建后的绑定.
+//
+// 泛型实参的位置不固定: 可能在顶层(PageSize[*T]), 也可能藏在切片元素([]T)、
+// map 值(map[string]PageSize[T])里. 这里按 Generic.Args / ElemType / KeyType 的顺序
+// 找到第一个带实参且本模块内可解析的类型, 用它自身的形参重新配对.
+//
+// 找不到时返回 nil, 调用方沿用外层绑定.
+func nestedBinding(q *astp.Query, ref *astp.TypeRef, outer astp.TypeArgBinding) astp.TypeArgBinding {
+	if q == nil || ref == nil {
+		return nil
+	}
+
+	// 深度优先, 带访问集合避免自引用泛型死循环.
+	seen := map[*astp.TypeRef]bool{}
+	var walk func(*astp.TypeRef) astp.TypeArgBinding
+	walk = func(r *astp.TypeRef) astp.TypeArgBinding {
+		if r == nil || seen[r] {
+			return nil
+		}
+		seen[r] = true
+
+		if r.Generic != nil && len(r.Generic.Args) > 0 && r.Name != "" {
+			if t := q.FindType(r.Name); t != nil {
+				if inner := astp.RebindTypeArgs(t, r.Generic.Args); len(inner) > 0 {
+					return inner
+				}
+			}
+		}
+		for _, arg := range genericArgs(r) {
+			if inner := walk(arg); inner != nil {
+				return inner
+			}
+		}
+		if inner := walk(r.ElemType); inner != nil {
+			return inner
+		}
+		if inner := walk(r.KeyType); inner != nil {
+			return inner
+		}
+		return nil
+	}
+
+	return walk(ref)
+}
+
+// genericArgs 返回 ref 上的泛型实参列表.
+func genericArgs(ref *astp.TypeRef) []*astp.TypeRef {
+	if ref == nil || ref.Generic == nil {
+		return nil
+	}
+	return ref.Generic.Args
+}
+
+// instantiateResult 按实参绑定实例化返回值类型, 让泛型占位(T / *T)变成真实类型.
+// 没有绑定时原样返回, 保持零成本.
+func instantiateResult(ref *astp.TypeRef, bind astp.TypeArgBinding) *astp.TypeRef {
+	if len(bind) == 0 {
+		return ref
+	}
+	return astp.InstantiateTypeRef(ref, bind)
 }

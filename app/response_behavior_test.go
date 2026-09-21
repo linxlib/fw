@@ -77,7 +77,7 @@ func TestResponseSchemaForRawResponseSkipsEnvelope(t *testing.T) {
 		Doc:     &astp.CommentGroup{ParsedAnnotations: []*astp.Annotation{{Name: "RawResponse"}}},
 		Results: []*astp.Param{{Type: &astp.TypeRef{Name: "string"}}},
 	}
-	schema := responseSchemaForMethod(nil, method)
+	schema := responseSchemaForMethod(nil, method, nil)
 	if schema == nil {
 		t.Fatal("expected schema")
 	}

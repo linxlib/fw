@@ -386,8 +386,10 @@ func (e *Engine) collectRoutes() error {
 				if len(routes) == 0 {
 					continue
 				}
+				// 泛型实参绑定: 让 schema 能展开真实的实体类型而不是 {}.
+				typeArgs := astp.RecvTypeArgs(q, typ, m)
+				respSchema := responseSchemaForMethod(q, m, typeArgs)
 				methodDesc := entityDescription(m.Name, m.Doc)
-				respSchema := responseSchemaForMethod(q, m)
 				methodMW := e.matchMiddleware(m.Doc, middleware.ScopeMethod)
 				ctrlIgnore := parseIgnoreList(typ.Doc)
 				methodIgnore := parseIgnoreList(m.Doc)
@@ -402,8 +404,8 @@ func (e *Engine) collectRoutes() error {
 					for _, name := range paramNames {
 						pathParamSet[name] = struct{}{}
 					}
-					hints := buildParamHints(q, m, pathParamSet)
-					opArgs, opBody := buildOpenAPIForMethod(q, m, hints)
+					hints := buildParamHints(q, m, pathParamSet, typeArgs)
+					opArgs, opBody := buildOpenAPIForMethod(q, m, hints, typeArgs)
 					key := rt.Method + " " + fullPath
 					if _, exists := seen[key]; exists {
 						return fmt.Errorf("duplicate route annotation in method %s.%s: %s", typ.Name, m.Name, key)
