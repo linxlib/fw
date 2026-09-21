@@ -226,7 +226,9 @@ func (q *Query) ResolveTypeRef(ref *TypeRef) *Type {
 		return nil
 	}
 
-	if ref.Kind == KindBasic {
+	// KindTypeParam 是类型参数引用（泛型方法/泛型函数签名里引用自身或接收器声明的
+	// 类型参数），不是具名类型，与 KindBasic 同样不参与解析。
+	if ref.Kind == KindBasic || ref.Kind == KindTypeParam {
 		return nil
 	}
 

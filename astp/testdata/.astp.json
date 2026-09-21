@@ -1,17 +1,26 @@
 {
   "packages": {
-    "astp/testdata": {
+    "github.com/linxlib/fw/v2/astp/testdata": {
       "name": "testdata",
-      "path": "astp/testdata",
+      "path": "github.com/linxlib/fw/v2/astp/testdata",
       "types": {
+        "Priority": {
+          "name": "Priority",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "kind": "enum",
+          "alias_of": {
+            "name": "int",
+            "kind": "basic"
+          }
+        },
         "Reader": {
           "name": "Reader",
-          "pkg_path": "astp/testdata",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
           "kind": "interface",
           "methods": [
             {
               "name": "Read",
-              "pkg_path": "astp/testdata",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
               "results": [
                 {
                   "name": "",
@@ -26,7 +35,7 @@
         },
         "Service": {
           "name": "Service",
-          "pkg_path": "astp/testdata",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
           "kind": "struct",
           "fields": [
             {
@@ -44,7 +53,7 @@
           "methods": [
             {
               "name": "GetUsers",
-              "pkg_path": "astp/testdata",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
               "recv": {
                 "name": "Service",
                 "kind": "pointer"
@@ -73,12 +82,25 @@
                 "annotations": [
                   "GET",
                   "Path"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET"
+                  },
+                  {
+                    "name": "Path",
+                    "raw": "@Path(\"/users\")",
+                    "args": [
+                      "/users"
+                    ]
+                  }
                 ]
               }
             },
             {
               "name": "CreateUser",
-              "pkg_path": "astp/testdata",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
               "recv": {
                 "name": "Service",
                 "kind": "pointer"
@@ -113,6 +135,19 @@
                 "annotations": [
                   "POST",
                   "Path"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "POST",
+                    "raw": "@POST"
+                  },
+                  {
+                    "name": "Path",
+                    "raw": "@Path(\"/users\")",
+                    "args": [
+                      "/users"
+                    ]
+                  }
                 ]
               }
             }
@@ -129,12 +164,383 @@
             "annotations": [
               "Service",
               "Path"
+            ],
+            "parsed_annotations": [
+              {
+                "name": "Service",
+                "raw": "@Service"
+              },
+              {
+                "name": "Path",
+                "raw": "@Path(\"/api\")",
+                "args": [
+                  "/api"
+                ]
+              }
             ]
+          }
+        },
+        "Stack": {
+          "name": "Stack",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "items",
+              "type": {
+                "kind": "slice",
+                "elem_type": {
+                  "name": "T",
+                  "kind": "struct"
+                }
+              },
+              "embedded": false
+            }
+          ],
+          "methods": [
+            {
+              "name": "Push",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Stack",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "params": [
+                {
+                  "name": "v",
+                  "type": {
+                    "name": "V",
+                    "kind": "typeparam"
+                  }
+                }
+              ],
+              "generic": {
+                "params": [
+                  {
+                    "name": "V",
+                    "constraints": [
+                      {
+                        "name": "any",
+                        "kind": "struct"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "doc": {
+                "list": [
+                  {
+                    "text": "Push 是带自身类型参数 V 的泛型方法（Go 1.27 generic methods）。"
+                  },
+                  {
+                    "text": "@POST"
+                  }
+                ],
+                "annotations": [
+                  "POST"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "POST",
+                    "raw": "@POST"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Pop",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Stack",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "T",
+                    "kind": "typeparam"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Pop 仅使用接收器(结构)的类型参数 T，方法自身没有类型参数。"
+                  },
+                  {
+                    "text": "@GET"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Wrap",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Stack",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "params": [
+                {
+                  "name": "u",
+                  "type": {
+                    "name": "U",
+                    "kind": "typeparam"
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "U",
+                    "kind": "typeparam"
+                  }
+                }
+              ],
+              "generic": {
+                "params": [
+                  {
+                    "name": "U",
+                    "constraints": [
+                      {
+                        "name": "T",
+                        "kind": "struct"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "doc": {
+                "list": [
+                  {
+                    "text": "Wrap 的方法自身类型参数约束引用结构类型参数。"
+                  },
+                  {
+                    "text": "@GET"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Convert",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Stack",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "params": [
+                {
+                  "name": "in",
+                  "type": {
+                    "kind": "slice",
+                    "elem_type": {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  }
+                }
+              ],
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "kind": "map",
+                    "key_type": {
+                      "name": "K",
+                      "kind": "typeparam"
+                    },
+                    "elem_type": {
+                      "name": "V",
+                      "kind": "typeparam"
+                    }
+                  }
+                }
+              ],
+              "generic": {
+                "params": [
+                  {
+                    "name": "K",
+                    "constraints": [
+                      {
+                        "name": "comparable",
+                        "kind": "struct"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "V",
+                    "constraints": [
+                      {
+                        "name": "any",
+                        "kind": "struct"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "doc": {
+                "list": [
+                  {
+                    "text": "Convert 有多个方法自身类型参数，且参数/返回值使用复合类型。"
+                  },
+                  {
+                    "text": "@GET"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Ptr",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Stack",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "params": [
+                {
+                  "name": "v",
+                  "type": {
+                    "name": "V",
+                    "kind": "pointer"
+                  }
+                }
+              ],
+              "generic": {
+                "params": [
+                  {
+                    "name": "V",
+                    "constraints": [
+                      {
+                        "name": "any",
+                        "kind": "struct"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "doc": {
+                "list": [
+                  {
+                    "text": "Ptr 的方法自身类型参数以指针形式出现在参数里。"
+                  },
+                  {
+                    "text": "@GET"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET"
+                  }
+                ]
+              }
+            }
+          ],
+          "generic": {
+            "params": [
+              {
+                "name": "T",
+                "constraints": [
+                  {
+                    "name": "any",
+                    "kind": "struct"
+                  }
+                ]
+              }
+            ]
+          },
+          "doc": {
+            "list": [
+              {
+                "text": "Stack 是一个泛型结构体，用于测试 Go 1.27 方法泛型的解析。"
+              }
+            ]
+          }
+        },
+        "Status": {
+          "name": "Status",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "kind": "enum",
+          "alias_of": {
+            "name": "int",
+            "kind": "basic"
           }
         },
         "User": {
           "name": "User",
-          "pkg_path": "astp/testdata",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
           "kind": "struct",
           "fields": [
             {
@@ -164,7 +570,7 @@
           "methods": [
             {
               "name": "GetName",
-              "pkg_path": "astp/testdata",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
               "recv": {
                 "name": "User",
                 "kind": "pointer"
@@ -181,7 +587,7 @@
             },
             {
               "name": "Copy",
-              "pkg_path": "astp/testdata",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
               "recv": {
                 "name": "User",
                 "kind": "pointer"
@@ -202,7 +608,7 @@
       "functions": {
         "CreateUser": {
           "name": "CreateUser",
-          "pkg_path": "astp/testdata",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
           "params": [
             {
               "name": "name",
@@ -228,20 +634,259 @@
               }
             }
           ]
+        },
+        "Filter": {
+          "name": "Filter",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "params": [
+            {
+              "name": "in",
+              "type": {
+                "kind": "slice",
+                "elem_type": {
+                  "name": "T",
+                  "kind": "typeparam"
+                }
+              }
+            },
+            {
+              "name": "keep",
+              "type": {
+                "kind": "func"
+              }
+            }
+          ],
+          "results": [
+            {
+              "name": "",
+              "type": {
+                "kind": "slice",
+                "elem_type": {
+                  "name": "R",
+                  "kind": "typeparam"
+                }
+              }
+            }
+          ],
+          "generic": {
+            "params": [
+              {
+                "name": "T",
+                "constraints": [
+                  {
+                    "name": "any",
+                    "kind": "struct"
+                  }
+                ]
+              },
+              {
+                "name": "R",
+                "constraints": [
+                  {
+                    "name": "any",
+                    "kind": "struct"
+                  }
+                ]
+              }
+            ]
+          },
+          "doc": {
+            "list": [
+              {
+                "text": "Filter 是自由泛型函数，与方法共用同一套类型参数解析。"
+              },
+              {
+                "text": "@GET"
+              }
+            ],
+            "annotations": [
+              "GET"
+            ],
+            "parsed_annotations": [
+              {
+                "name": "GET",
+                "raw": "@GET"
+              }
+            ]
+          }
+        },
+        "MapKeys": {
+          "name": "MapKeys",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "params": [
+            {
+              "name": "in",
+              "type": {
+                "kind": "slice",
+                "elem_type": {
+                  "name": "K",
+                  "kind": "typeparam"
+                }
+              }
+            }
+          ],
+          "results": [
+            {
+              "name": "",
+              "type": {
+                "kind": "map",
+                "key_type": {
+                  "name": "K",
+                  "kind": "typeparam"
+                },
+                "elem_type": {
+                  "name": "bool",
+                  "kind": "basic"
+                }
+              }
+            }
+          ],
+          "generic": {
+            "params": [
+              {
+                "name": "K",
+                "constraints": [
+                  {
+                    "name": "int",
+                    "kind": "basic"
+                  },
+                  {
+                    "name": "string",
+                    "kind": "basic"
+                  }
+                ]
+              }
+            ]
+          },
+          "doc": {
+            "list": [
+              {
+                "text": "MapKeys 的自由函数类型参数约束是联合类型。"
+              },
+              {
+                "text": "@GET"
+              }
+            ],
+            "annotations": [
+              "GET"
+            ],
+            "parsed_annotations": [
+              {
+                "name": "GET",
+                "raw": "@GET"
+              }
+            ]
+          }
         }
       },
       "variables": {
         "DefaultUser": {
           "name": "DefaultUser",
-          "pkg_path": "astp/testdata",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
           "type": null
         }
       },
       "constants": {
+        "PriorityHigh": {
+          "name": "PriorityHigh",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "type": {
+            "name": "Priority",
+            "kind": "struct"
+          },
+          "value": "3"
+        },
+        "PriorityLow": {
+          "name": "PriorityLow",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "type": {
+            "name": "Priority",
+            "kind": "struct"
+          },
+          "value": "1"
+        },
+        "PriorityMedium": {
+          "name": "PriorityMedium",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "type": {
+            "name": "Priority",
+            "kind": "struct"
+          },
+          "value": "2"
+        },
+        "StatusActive": {
+          "name": "StatusActive",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "type": {
+            "name": "Status",
+            "kind": "struct"
+          },
+          "value": "iota"
+        },
+        "StatusInactive": {
+          "name": "StatusInactive",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "type": {
+            "name": "Status",
+            "kind": "struct"
+          }
+        },
+        "StatusPending": {
+          "name": "StatusPending",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "type": {
+            "name": "Status",
+            "kind": "struct"
+          }
+        },
         "Version": {
           "name": "Version",
-          "pkg_path": "astp/testdata",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
           "value": "\"1.0.0\""
+        }
+      },
+      "enums": {
+        "Priority": {
+          "name": "Priority",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "type": {
+            "name": "Priority",
+            "kind": "struct"
+          },
+          "values": [
+            {
+              "name": "PriorityLow",
+              "value": "1"
+            },
+            {
+              "name": "PriorityMedium",
+              "value": "2"
+            },
+            {
+              "name": "PriorityHigh",
+              "value": "3"
+            }
+          ]
+        },
+        "Status": {
+          "name": "Status",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "type": {
+            "name": "Status",
+            "kind": "struct"
+          },
+          "values": [
+            {
+              "name": "StatusActive",
+              "value": "iota"
+            },
+            {
+              "name": "StatusInactive"
+            },
+            {
+              "name": "StatusPending"
+            }
+          ]
         }
       }
     }

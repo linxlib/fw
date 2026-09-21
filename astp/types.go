@@ -21,6 +21,9 @@ const (
 	KindInterface TypeKind = "interface"
 	KindAlias     TypeKind = "alias"
 	KindBasic     TypeKind = "basic"
+	// KindTypeParam 表示这是一个类型参数引用（泛型方法/泛型函数的签名里引用自身
+	// 或接收器声明的类型参数），不是具名类型，因此不参与具名类型解析。
+	KindTypeParam TypeKind = "typeparam"
 	KindSlice     TypeKind = "slice"
 	KindMap       TypeKind = "map"
 	KindPointer   TypeKind = "pointer"

@@ -107,6 +107,8 @@ func (p *Parser) Parse(dir string) (*Project, error) {
 		p.parseFile(pkgInfo, file, pkgPath)
 	}
 
+	p.finalizeTypeParams()
+	p.finalizeTypeParams(pkgPath)
 	return p.project, nil
 }
 
@@ -299,18 +301,7 @@ func (p *Parser) parseTypeSpec(spec *ast.TypeSpec, doc *ast.CommentGroup, pkgPat
 		t.Doc = parseDoc(spec.Doc)
 	}
 
-	if spec.TypeParams != nil {
-		t.Generic = &GenericSpec{}
-		for _, param := range spec.TypeParams.List {
-			for _, name := range param.Names {
-				gp := &GenericParam{Name: name.Name}
-				if param.Type != nil {
-					gp.Constraints = append(gp.Constraints, p.parseTypeRef(param.Type))
-				}
-				t.Generic.Params = append(t.Generic.Params, gp)
-			}
-		}
-	}
+	t.Generic = p.parseGenericSpec(spec.TypeParams)
 
 	switch st := spec.Type.(type) {
 	case *ast.StructType:
@@ -440,15 +431,9 @@ func (p *Parser) parseFuncDecl(pkgInfo *Package, decl *ast.FuncDecl) {
 		fn.Recv = p.parseTypeRef(recv.Type)
 	}
 
-	if decl.Type.TypeParams != nil {
-		fn.Generic = &GenericSpec{}
-		for _, param := range decl.Type.TypeParams.List {
-			for _, name := range param.Names {
-				gp := &GenericParam{Name: name.Name}
-				fn.Generic.Params = append(fn.Generic.Params, gp)
-			}
-		}
-	}
+	// 函数/方法自身声明的类型参数：自由函数（Go 1.18）与方法（Go 1.27 泛型方法）共用。
+	// 方法自身类型参数存于 Func.Generic；接收器上的结构体类型实参存于 Func.Recv.Generic。
+	fn.Generic = p.parseGenericSpec(decl.Type.TypeParams)
 
 	fn.Params = p.parseParams(decl.Type.Params)
 	fn.Results = p.parseParams(decl.Type.Results)
@@ -480,6 +465,87 @@ func (p *Parser) parseParams(params *ast.FieldList) []*Param {
 	}
 
 	return result
+}
+
+// parseGenericSpec 解析声明头的类型参数列表。
+//
+// 结构体（Go 1.18 类型泛型）、自由函数（Go 1.18 函数泛型）与方法（Go 1.27 方法泛型）
+// 共用同一套解析，保证三者的 GenericParam.Constraints 行为一致。
+// fields 为 nil 或没有条目时返回 nil，因此「没有类型参数」与「有类型参数」可区分。
+func (p *Parser) parseGenericSpec(fields *ast.FieldList) *GenericSpec {
+	if fields == nil || len(fields.List) == 0 {
+		return nil
+	}
+
+	spec := &GenericSpec{}
+	for _, param := range fields.List {
+		for _, name := range param.Names {
+			gp := &GenericParam{Name: name.Name}
+			if param.Type != nil {
+				gp.Constraints = p.parseTypeParamConstraints(param.Type)
+			}
+			spec.Params = append(spec.Params, gp)
+		}
+	}
+	return spec
+}
+
+// parseTypeParamConstraints 解析单个类型参数的约束表达式，返回被约束类型的引用列表。
+//
+// 支持的写法（均为 go1.27 实测 AST 形态）：
+//
+//	T any                        -> Ident(any)
+//	T comparable                 -> Ident(comparable)
+//	T ~U                         -> UnaryExpr(~)
+//	T int | string               -> BinaryExpr(|)
+//	T (int | string)             -> ParenExpr
+//	T interface{ ~int | string } -> InterfaceType
+//
+// `~` 运算符本身不落库：`~T` 与 `T` 都记录为对被约束类型的引用，
+// 这与 GenericParam.Constraints []*TypeRef 的既有形状一致，无需新增字段。
+func (p *Parser) parseTypeParamConstraints(expr ast.Expr) []*TypeRef {
+	var out []*TypeRef
+
+	var walk func(ast.Expr)
+	walk = func(e ast.Expr) {
+		switch t := e.(type) {
+		case nil:
+			return
+		case *ast.ParenExpr:
+			walk(t.X)
+			return
+		case *ast.BinaryExpr:
+			// 联合约束 A|B（以及 A|B|C 的左结合链）
+			if t.Op == token.OR {
+				walk(t.X)
+				walk(t.Y)
+				return
+			}
+		case *ast.UnaryExpr:
+			// ~T：约束为 T 的底层类型集合，保留 T 的引用
+			if t.Op == token.TILDE {
+				walk(t.X)
+				return
+			}
+		case *ast.InterfaceType:
+			// interface{ ~int | string }：接口字面量的元素就是并集的各个分支
+			if t.Methods != nil {
+				for _, m := range t.Methods.List {
+					if m != nil {
+						walk(m.Type)
+					}
+				}
+				return
+			}
+		}
+
+		if ref := p.parseTypeRef(e); ref != nil {
+			out = append(out, ref)
+		}
+	}
+
+	walk(expr)
+	return out
 }
 
 func (p *Parser) parseTypeRef(expr ast.Expr) *TypeRef {
@@ -532,6 +598,15 @@ func (p *Parser) parseTypeRef(expr ast.Expr) *TypeRef {
 			ref.Generic.Args = append(ref.Generic.Args, p.parseTypeRef(idx))
 		}
 		return ref
+	case *ast.ParenExpr:
+		// 括号包裹的类型表达式（如类型参数约束里的 (int | string)），降级为内部类型
+		return p.parseTypeRef(t.X)
+	case *ast.UnaryExpr:
+		// ~T：约束为 T 的底层类型集合，保留 T 的引用（~ 运算符本身不落库）
+		if t.Op == token.TILDE {
+			return p.parseTypeRef(t.X)
+		}
+		return &TypeRef{Kind: KindBasic}
 	default:
 		return &TypeRef{Kind: KindBasic}
 	}
@@ -575,6 +650,146 @@ func exprToString(expr ast.Expr) string {
 	}
 }
 
+// finalizeTypeParams 在全部声明解析完成后执行一遍后处理：
+// 把函数/方法签名中「直接以类型参数为类型」的 TypeRef 标记为 KindTypeParam。
+//
+// 之所以放到末尾而不是在 parseFuncDecl 里内联做，是因为方法的接收器类型实参
+// （如 *Stack[T] 里的 T）需要知道 Stack 自身声明的类型参数，而方法在源码中的位置
+// 可能早于结构体声明。放在末尾则无论声明顺序如何都能拿到完整的 pkg.Types。
+//
+// 可见类型参数名集合 = 该 Func 自身声明的类型参数 ∪（方法）接收器基类型声明的类型参数。
+// 方法必与其接收器类型同包，因此这一步是精确的。
+//
+// 该函数幂等：已标记的引用再次标记结果不变，所以重复调用是安全的。
+//
+// pkgPaths 限定只处理这些包；不传则处理整个项目。Parse 每次只解析一个目录，
+// 因此按包调用即可（方法必与接收器类型同包，按包处理不丢信息），
+// 避免 ParseProject 逐目录解析时对整个项目反复全量扫描。
+func (p *Parser) finalizeTypeParams(pkgPaths ...string) {
+	if p.project == nil {
+		return
+	}
+
+	targets := p.project.Packages
+	if len(pkgPaths) > 0 {
+		targets = make(map[string]*Package, len(pkgPaths))
+		for _, path := range pkgPaths {
+			if pkg, ok := p.project.Packages[path]; ok {
+				targets[path] = pkg
+			}
+		}
+	}
+
+	for _, pkg := range targets {
+		if pkg == nil {
+			continue
+		}
+
+		for _, fn := range pkg.Functions {
+			if fn == nil {
+				continue
+			}
+			scope := p.typeParamScope(pkg, fn)
+			if len(scope) == 0 {
+				continue
+			}
+			markTypeParamRefs(fn.Params, scope)
+			markTypeParamRefs(fn.Results, scope)
+			markTypeParamRef(fn.Recv, scope)
+		}
+
+		for _, typ := range pkg.Types {
+			if typ == nil {
+				continue
+			}
+			for _, m := range typ.Methods {
+				if m == nil {
+					continue
+				}
+				scope := p.typeParamScope(pkg, m)
+				if len(scope) == 0 {
+					continue
+				}
+				markTypeParamRefs(m.Params, scope)
+				markTypeParamRefs(m.Results, scope)
+				markTypeParamRef(m.Recv, scope)
+			}
+		}
+	}
+}
+
+// typeParamScope 收集一个函数/方法签名内可见的类型参数名。
+func (p *Parser) typeParamScope(pkg *Package, fn *Func) map[string]bool {
+	if fn == nil {
+		return nil
+	}
+
+	scope := make(map[string]bool)
+	for _, gp := range genericParamNames(fn.Generic) {
+		scope[gp] = true
+	}
+
+	// 方法：接收器基类型声明的类型参数同样在签名内可见。
+	// 例如 func (s *Stack[T]) Pop() T，这里的 T 来自 Stack 自身的声明。
+	if fn.Recv != nil && fn.Recv.Name != "" && pkg != nil {
+		if base, ok := pkg.Types[fn.Recv.Name]; ok {
+			for _, gp := range genericParamNames(base.Generic) {
+				scope[gp] = true
+			}
+		}
+	}
+
+	return scope
+}
+
+func genericParamNames(spec *GenericSpec) []string {
+	if spec == nil {
+		return nil
+	}
+	var names []string
+	for _, gp := range spec.Params {
+		if gp != nil && gp.Name != "" {
+			names = append(names, gp.Name)
+		}
+	}
+	return names
+}
+
+// markTypeParamRefs 把一个参数/返回值列表里直接以类型参数为类型的引用标记出来。
+//
+// 标记规则刻意保守：
+//   - 只改 Kind == KindStruct 且 PkgPath == "" 的引用，也就是「同包内的裸名字」；
+//     带 pkg_path 的跨包引用（demo.TestStruct）不可能是类型参数。
+//   - *V 这类外层为指针的引用保持 KindPointer：指针形状对调用方更有价值，
+//     因此不改写（代价是这类引用仍按名字解析）。
+//   - []T 的 elem_type、map[K]V 的 key_type/elem_type 会被递归标记。
+func markTypeParamRefs(params []*Param, scope map[string]bool) {
+	for _, param := range params {
+		if param == nil {
+			continue
+		}
+		markTypeParamRef(param.Type, scope)
+	}
+}
+
+func markTypeParamRef(ref *TypeRef, scope map[string]bool) {
+	if ref == nil || len(scope) == 0 {
+		return
+	}
+
+	if ref.Kind == KindStruct && ref.PkgPath == "" && scope[ref.Name] {
+		ref.Kind = KindTypeParam
+	}
+
+	if ref.Generic != nil {
+		for _, arg := range ref.Generic.Args {
+			markTypeParamRef(arg, scope)
+		}
+	}
+	markTypeParamRef(ref.KeyType, scope)
+	markTypeParamRef(ref.ElemType, scope)
+}
+
 func (p *Parser) ParseProject(rootDir string) (*Project, error) {
 	absRoot, err := filepath.Abs(rootDir)
 	if err != nil {
@@ -615,6 +830,8 @@ func (p *Parser) ParseProject(rootDir string) (*Project, error) {
 	if err != nil {
 		return nil, fmt.Errorf("walk project: %w", err)
 	}
+
+	p.finalizeTypeParams()
 
 	return p.project, nil
 }
