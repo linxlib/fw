@@ -25,6 +25,7 @@ type ParamHint struct {
 }
 
 func buildParamHints(q *astp.Query, method *astp.Func, pathParamSet map[string]struct{}) map[string]ParamHint {
+	typeParams := typeParamNames(method)
 	hints := make(map[string]ParamHint)
 	for _, p := range method.Params {
 		if p == nil || p.Name == "" {
@@ -33,16 +34,68 @@ func buildParamHints(q *astp.Query, method *astp.Func, pathParamSet map[string]s
 		if isContextParam(p.Type) {
 			continue
 		}
-		source := inferBindSource(q, p, pathParamSet)
+		source := inferBindSource(q, p, pathParamSet, typeParams)
 		hints[p.Name] = ParamHint{Name: p.Name, Source: source}
 	}
 	return hints
 }
 
-func inferBindSource(q *astp.Query, p *astp.Param, pathParamSet map[string]struct{}) BindSource {
+// typeParamNames 返回一个函数/方法签名内可见的类型参数名集合:
+// 方法自身声明的类型参数(Go 1.27 泛型方法) ∪ 接收器上的结构体类型实参.
+//
+// 泛型基础控制器的方法正是靠后者拿到实体类型占位, 例如
+//
+//	func (c *BaseController[T]) Create(ctx context.Context, entity *T) error
+//
+// 这里的 T 来自接收器 BaseController[T], 具体类型(如 User)只在实例化时可知.
+func typeParamNames(method *astp.Func) map[string]bool {
+	if method == nil {
+		return nil
+	}
+
+	var names []string
+	if method.Generic != nil {
+		for _, gp := range method.Generic.Params {
+			if gp != nil && gp.Name != "" {
+				names = append(names, gp.Name)
+			}
+		}
+	}
+	if method.Recv != nil && method.Recv.Generic != nil {
+		for _, arg := range method.Recv.Generic.Args {
+			if arg != nil && arg.Name != "" {
+				names = append(names, arg.Name)
+			}
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+
+	out := make(map[string]bool, len(names))
+	for _, n := range names {
+		out[n] = true
+	}
+	return out
+}
+
+func inferBindSource(q *astp.Query, p *astp.Param, pathParamSet map[string]struct{}, typeParams map[string]bool) BindSource {
 	if p == nil || p.Type == nil {
 		return BindQuery
 	}
+
+	// 泛型占位参数优先判定: 形如 entity *T / value T, T 是方法自身或接收器的类型参数.
+	// 静态阶段无法解析到具体类型, 但指针/结构形参在 HTTP 语义上是请求体,
+	// 标量占位则按 query 处理(调用点才知道真实类型).
+	if len(typeParams) > 0 && p.Type.Name != "" && typeParams[p.Type.Name] {
+		switch p.Type.Kind {
+		case astp.KindPointer, astp.KindStruct, astp.KindTypeParam:
+			return BindBody
+		default:
+			return BindQuery
+		}
+	}
+
 	typeName := p.Type.Name
 	resolved := q.ResolveParamType(p)
 	if resolved != nil {

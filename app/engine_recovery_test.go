@@ -9,7 +9,6 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/linxlib/fw/v2/astp"
-	"github.com/linxlib/fw/v2/config"
 	"github.com/linxlib/fw/v2/inject"
 	"github.com/linxlib/fw/v2/logger"
 	"github.com/linxlib/fw/v2/middleware"
@@ -127,12 +126,12 @@ func newRecoveryTestEngine(t *testing.T, returnStack bool) *Engine {
 		t.Fatalf("create logger: %v", err)
 	}
 
-	cfg := config.Default()
+	cfg := DefaultEngineConfig()
 	cfg.Recovery.Enabled = true
 	cfg.Recovery.ReturnStackToBody = returnStack
 
 	e := &Engine{
-		cfg:             cfg,
+		cfg:             ptrEngineConfig(cfg),
 		log:             logg,
 		router:          router.New(),
 		globalContainer: inject.New(),

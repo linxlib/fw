@@ -4,6 +4,732 @@
       "name": "testdata",
       "path": "github.com/linxlib/fw/v2/astp/testdata",
       "types": {
+        "Base": {
+          "name": "Base",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "items",
+              "type": {
+                "kind": "slice",
+                "elem_type": {
+                  "name": "T",
+                  "kind": "struct"
+                }
+              },
+              "embedded": false
+            }
+          ],
+          "methods": [
+            {
+              "name": "Name",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Base",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "string",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Name 返回基础结构体自身的方法."
+                  },
+                  {
+                    "text": "@GET /base/name"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /base/name",
+                    "args": [
+                      "/base/name"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Count",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Base",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "int",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Count 返回元素个数, 引用结构体自身的类型参数 T."
+                  },
+                  {
+                    "text": "@GET /base/count"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /base/count",
+                    "args": [
+                      "/base/count"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "generic": {
+            "params": [
+              {
+                "name": "T",
+                "constraints": [
+                  {
+                    "name": "any",
+                    "kind": "struct"
+                  }
+                ]
+              }
+            ]
+          },
+          "doc": {
+            "list": [
+              {
+                "text": "Base 是被嵌入的泛型基础结构体, 用于测试方法提升(method promotion)."
+              }
+            ]
+          }
+        },
+        "Middle": {
+          "name": "Middle",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "",
+              "type": {
+                "name": "Base",
+                "kind": "struct",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "struct"
+                    }
+                  ]
+                }
+              },
+              "embedded": true
+            },
+            {
+              "name": "label",
+              "type": {
+                "name": "string",
+                "kind": "basic"
+              },
+              "embedded": false
+            }
+          ],
+          "methods": [
+            {
+              "name": "Label",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Middle",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "string",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Label 是 Middle 自身声明的方法."
+                  },
+                  {
+                    "text": "@GET /middle/label"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /middle/label",
+                    "args": [
+                      "/middle/label"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Name",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Base",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "string",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Name 返回基础结构体自身的方法."
+                  },
+                  {
+                    "text": "@GET /base/name"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /base/name",
+                    "args": [
+                      "/base/name"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Count",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Base",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "int",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Count 返回元素个数, 引用结构体自身的类型参数 T."
+                  },
+                  {
+                    "text": "@GET /base/count"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /base/count",
+                    "args": [
+                      "/base/count"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "generic": {
+            "params": [
+              {
+                "name": "T",
+                "constraints": [
+                  {
+                    "name": "any",
+                    "kind": "struct"
+                  }
+                ]
+              }
+            ]
+          },
+          "doc": {
+            "list": [
+              {
+                "text": "Middle 嵌入 Base, 形成两层提升链."
+              }
+            ]
+          }
+        },
+        "Outer": {
+          "name": "Outer",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "",
+              "type": {
+                "name": "Middle",
+                "kind": "struct",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "struct"
+                    }
+                  ]
+                }
+              },
+              "embedded": true
+            }
+          ],
+          "methods": [
+            {
+              "name": "Name",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Outer",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "string",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Name 遮蔽 Base.Name: 外层显式声明的方法优先, 距离更近的 Middle 也优先."
+                  },
+                  {
+                    "text": "@GET /outer/name"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /outer/name",
+                    "args": [
+                      "/outer/name"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Own",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Outer",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "string",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Own 是 Outer 自身声明的方法."
+                  },
+                  {
+                    "text": "@GET /outer/own"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /outer/own",
+                    "args": [
+                      "/outer/own"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Label",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Middle",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "string",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Label 是 Middle 自身声明的方法."
+                  },
+                  {
+                    "text": "@GET /middle/label"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /middle/label",
+                    "args": [
+                      "/middle/label"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Count",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Base",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "int",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Count 返回元素个数, 引用结构体自身的类型参数 T."
+                  },
+                  {
+                    "text": "@GET /base/count"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /base/count",
+                    "args": [
+                      "/base/count"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "generic": {
+            "params": [
+              {
+                "name": "T",
+                "constraints": [
+                  {
+                    "name": "any",
+                    "kind": "struct"
+                  }
+                ]
+              }
+            ]
+          },
+          "doc": {
+            "list": [
+              {
+                "text": "Outer 嵌入 Middle, 应同时获得 Middle 自身的方法与 Base 提升上来的方法."
+              }
+            ]
+          }
+        },
+        "Plain": {
+          "name": "Plain",
+          "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "",
+              "type": {
+                "name": "Base",
+                "kind": "struct",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "string",
+                      "kind": "basic"
+                    }
+                  ]
+                }
+              },
+              "embedded": true
+            }
+          ],
+          "methods": [
+            {
+              "name": "Describe",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Plain",
+                "kind": "pointer"
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "string",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Describe 是 Plain 自身声明的方法."
+                  },
+                  {
+                    "text": "@GET /plain/describe"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /plain/describe",
+                    "args": [
+                      "/plain/describe"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Name",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Base",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "string",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Name 返回基础结构体自身的方法."
+                  },
+                  {
+                    "text": "@GET /base/name"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /base/name",
+                    "args": [
+                      "/base/name"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Count",
+              "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",
+              "recv": {
+                "name": "Base",
+                "kind": "pointer",
+                "generic": {
+                  "args": [
+                    {
+                      "name": "T",
+                      "kind": "typeparam"
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "name": "",
+                  "type": {
+                    "name": "int",
+                    "kind": "basic"
+                  }
+                }
+              ],
+              "doc": {
+                "list": [
+                  {
+                    "text": "Count 返回元素个数, 引用结构体自身的类型参数 T."
+                  },
+                  {
+                    "text": "@GET /base/count"
+                  }
+                ],
+                "annotations": [
+                  "GET"
+                ],
+                "parsed_annotations": [
+                  {
+                    "name": "GET",
+                    "raw": "@GET /base/count",
+                    "args": [
+                      "/base/count"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "doc": {
+            "list": [
+              {
+                "text": "Plain 是非泛型结构体, 嵌入泛型 Base 后同样获得提升方法."
+              }
+            ]
+          }
+        },
         "Priority": {
           "name": "Priority",
           "pkg_path": "github.com/linxlib/fw/v2/astp/testdata",

@@ -28,8 +28,9 @@ import (
 )
 
 type Engine struct {
-	cfg             config.Config
+	cfg             *EngineConfig
 	log             *logger.Logger
+	loader          *config.Config
 	router          *router.Router
 	globalContainer inject.Injector
 	responseManager *response.Manager
@@ -63,17 +64,29 @@ type routeDef struct {
 	MethodMW          []middleware.Bound
 }
 
+// New 创建引擎并加载配置.
+//
+// configPath 为 YAML 配置文件路径, 传空串时使用 config 包缺省的 config/config.yaml.
+// 配置按 app/config.go 里 EngineConfig 的 inject tag 注入, 文件中缺失的段保留缺省值.
 func New(configPath string) (*Engine, error) {
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		return nil, err
+	opts := &config.Option{}
+	if strings.TrimSpace(configPath) != "" {
+		opts.Files = []string{configPath}
 	}
+	loader := config.New(opts)
+
+	cfg := DefaultEngineConfig()
+	if err := loader.LoadByTags(&cfg); err != nil {
+		return nil, fmt.Errorf("load config: %w", err)
+	}
+
 	logg, err := logger.New(cfg.Log.Level, cfg.Log.Output, cfg.Log.FilePath, cfg.Log.EnableFile)
 	if err != nil {
 		return nil, err
 	}
 	return &Engine{
-		cfg:             cfg,
+		cfg:             &cfg,
+		loader:          loader,
 		log:             logg,
 		router:          router.New(),
 		globalContainer: inject.New(),
@@ -167,15 +180,18 @@ func (e *Engine) injectMiddlewareDependencies(mw middleware.Middleware, name str
 	_ = container.Apply(mw)
 }
 
+// middlewareConfig 返回某个中间件对应的配置段(按中间件名小写匹配).
+// 配置文件里没有对应段时返回空 Section, 因此中间件无需判空.
 func (e *Engine) middlewareConfig(name string) *config.Section {
 	key := strings.ToLower(strings.TrimSpace(name))
-	section, ok := e.cfg.Middlewares[key]
-	if !ok {
-		empty := config.NewSection(nil)
-		return &empty
+	if e.cfg != nil && e.cfg.Middlewares != nil {
+		if section, ok := e.cfg.Middlewares[key]; ok {
+			cpy := section
+			return &cpy
+		}
 	}
-	cpy := section
-	return &cpy
+	empty := config.NewSection(nil)
+	return &empty
 }
 
 // EmbedProject sets pre-generated AST metadata (the contents of .astp.json).
@@ -428,7 +444,7 @@ func (e *Engine) registerRoutes() error {
 		}
 		seen[key] = struct{}{}
 		rtCopy := rt
-		e.router.Handle(rt.Method, rt.Path, func(raw *fasthttp.RequestCtx) {
+		e.router.Handle(rt.Method, routerPath(rt.Path), func(raw *fasthttp.RequestCtx) {
 			start := time.Now()
 			if e.cfg.Log.RequestEnabled {
 				defer func() {
@@ -755,6 +771,24 @@ func pathParamNames(path string) []string {
 		}
 	}
 	return out
+}
+
+// routerPath 把 fw 的 ":name" 路由语法转换成 fasthttp/router 的 "{name}" 语法.
+//
+// fw 的注解与 pathParamNames 一直使用 ":name"(如 @GET /users/:id), 而
+// github.com/fasthttp/router 从 v1.5 起改用 "{name}", ":name" 会被当成普通静态段,
+// 导致所有参数路由静默失配(返回 404). 这里在注册边界上做一次转换, 保持对外语法不变.
+func routerPath(path string) string {
+	if !strings.Contains(path, ":") {
+		return path
+	}
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		if strings.HasPrefix(part, ":") && len(part) > 1 {
+			parts[i] = "{" + part[1:] + "}"
+		}
+	}
+	return strings.Join(parts, "/")
 }
 
 func operationIDForRoute(rt routeDef) string {

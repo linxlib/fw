@@ -7,7 +7,6 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/linxlib/fw/v2/astp"
-	"github.com/linxlib/fw/v2/config"
 	"github.com/linxlib/fw/v2/inject"
 	"github.com/linxlib/fw/v2/logger"
 	"github.com/linxlib/fw/v2/middleware"
@@ -115,7 +114,7 @@ func newResponseTestEngine(t *testing.T, handler reflect.Value, method *astp.Fun
 	}
 
 	e := &Engine{
-		cfg:             config.Default(),
+		cfg:             ptrEngineConfig(DefaultEngineConfig()),
 		log:             logg,
 		router:          router.New(),
 		globalContainer: inject.New(),

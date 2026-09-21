@@ -1,6 +1,6 @@
 module github.com/linxlib/fw/v2
 
-go 1.25
+go 1.27
 
 require (
 	github.com/fasthttp/router v1.5.4

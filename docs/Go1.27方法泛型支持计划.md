@@ -300,3 +300,40 @@ func MapKeys[K int | string](in []K) map[K]bool { return nil }
   （标记条件要求 `PkgPath == ""`），符合预期。
 - **静态占位**：方法自身类型参数的具体类型只在调用点可知，astp 作为静态解析器
   只保留「已声明」的占位，不做实例化替换，也不推断调用点的实参。
+
+## 落地情况（fw 侧与 fw_test demo）
+
+上述 astp 改动已接入 fw，并在 `fw_test`（`replace` 指向本地 fw）里落地成一个完整 demo：
+
+### fw 侧
+
+- **`go.mod` 升到 `go 1.27`**（解析器行为由运行时工具链决定，与语言版本声明无关，
+  升级是为了让使用泛型方法的业务代码能正常编译）。
+- **`app/param_binding.go`**：新增 `typeParamNames(method)`，把「方法自身类型参数 ∪
+  接收器类型实参」作为泛型占位集合。`inferBindSource` 优先判定这类参数：
+  `entity *T` 判为 `BindBody`，标量占位判为 `BindQuery`。
+- **`app/engine.go` 的配置接线重做**（顺带修好了上一个提交「新式配置库」留下的编译失败）：
+  新增 `app/config.go` 的 `EngineConfig`，通过 `config.Config.LoadByTags` 按 `inject` tag 注入；
+  `config` 包补回轻量的 `Section` 类型供中间件按名注入配置。
+- **`app/engine.go` 新增 `routerPath()`**：把 fw 的 `:name` 路由语法转换成
+  fasthttp/router 的 `{name}` 语法。`github.com/fasthttp/router` 从 v1.5 起改用 `{name}`，
+  fw 此前直接把 `:name` 注册进去，**所有参数路由都静默 404**（既有缺陷，本次修复）。
+  附带收益：生成的 OpenAPI 路径模板从此是合法的 `{id}`。
+
+### astp 侧的新增能力
+
+- **`finalizeEmbeddedMethods`**：嵌入字段的方法提升。这是「泛型基础控制器」能工作的前提——
+  `UserController` 内嵌 `BaseController[models.User]` 后，其 `Methods` 才会出现
+  `Create/Get/List/Update/Delete`。详见 `docs/结构设计.md` 与 `docs/整体解析流程.md`。
+
+### fw_test demo
+
+- `controllers/base_controller.go`：泛型 `BaseController[T any]`，提供
+  `ControllerName/MethodName/BodySize/HTTPMethodName/Meta` 与一整套内存版增删改查。
+- `controllers/user_controller.go`：`UserController` 只内嵌 `BaseController[models.User]`
+  并声明 3 个业务方法，**没有任何增删改查代码**，但全部 CRUD 路由都已注册并可调用。
+- `models/user.go`：演示用实体。
+
+端到端验证（真实起服务 + HTTP 请求）：`POST/GET/PUT/DELETE /users[/:id]`、
+`GET /users/_meta|profile|summary`、`POST /users/:id/disable` 全部符合预期；
+原有 `/api/hello/:name` 参数路由也随 `routerPath` 修复而恢复。

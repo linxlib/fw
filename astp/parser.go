@@ -107,7 +107,8 @@ func (p *Parser) Parse(dir string) (*Project, error) {
 		p.parseFile(pkgInfo, file, pkgPath)
 	}
 
-	p.finalizeTypeParams()
+	// 嵌入字段的方法提升必须先于类型参数标记: 提升上来的方法也要参与作用域计算.
+	p.finalizeEmbeddedMethods(pkgPath)
 	p.finalizeTypeParams(pkgPath)
 	return p.project, nil
 }
@@ -650,6 +651,91 @@ func exprToString(expr ast.Expr) string {
 	}
 }
 
+// finalizeEmbeddedMethods 把嵌入字段所在类型的方法提升到外层结构体上。
+//
+// Go 的方法提升规则：外层结构体自动拥有其嵌入字段（含嵌入字段的嵌入字段）的方法；
+// 外层自身显式声明的方法优先（遮蔽）。泛型基础控制器的能力正是通过这条规则传递的：
+//
+//	type BaseController[T any] struct{ ... }
+//	func (c *BaseController[T]) Create(...) {}
+//
+//	type UserController struct {
+//	    BaseController[User]   // Create 等方法被提升到 UserController 上
+//	}
+//
+// 提升上来的方法与原方法共享同一个 *Func（只读），其 Recv 仍指向嵌入类型本身。
+// 目前只处理同包内可解析的嵌入类型；跨包嵌入类型的方法提升留作后续项。
+func (p *Parser) finalizeEmbeddedMethods(pkgPaths ...string) {
+	if p.project == nil {
+		return
+	}
+
+	targets := p.project.Packages
+	if len(pkgPaths) > 0 {
+		targets = make(map[string]*Package, len(pkgPaths))
+		for _, path := range pkgPaths {
+			if pkg, ok := p.project.Packages[path]; ok {
+				targets[path] = pkg
+			}
+		}
+	}
+
+	for _, pkg := range targets {
+		if pkg == nil {
+			continue
+		}
+		for _, t := range pkg.Types {
+			if t == nil || t.Kind != KindStruct || len(t.Fields) == 0 {
+				continue
+			}
+
+			// 已占用的名字：外层自身显式声明的方法优先，同深度先到先得。
+			taken := make(map[string]bool, len(t.Methods))
+			for _, m := range t.Methods {
+				if m != nil {
+					taken[m.Name] = true
+				}
+			}
+
+			var promoted []*Func
+			visited := map[string]bool{t.Name: true}
+			p.collectEmbeddedMethods(pkg, t, visited, taken, &promoted)
+			if len(promoted) > 0 {
+				t.Methods = append(t.Methods, promoted...)
+			}
+		}
+	}
+}
+
+// collectEmbeddedMethods 深度优先遍历 t 的嵌入字段，把可解析嵌入类型的方法收集到 out。
+// taken 记录已被占用的方法名（外层显式方法 + 更浅深度已收集的方法），visited 防止循环嵌入。
+func (p *Parser) collectEmbeddedMethods(pkg *Package, t *Type, visited, taken map[string]bool, out *[]*Func) {
+	for _, f := range t.Fields {
+		if f == nil || !f.Embedded || f.Type == nil || f.Type.Name == "" {
+			continue
+		}
+		name := f.Type.Name
+		if visited[name] {
+			continue
+		}
+		visited[name] = true
+
+		emb, ok := pkg.Types[name]
+		if !ok || emb == nil || emb.Kind != KindStruct {
+			continue
+		}
+		for _, m := range emb.Methods {
+			if m == nil || taken[m.Name] {
+				continue
+			}
+			taken[m.Name] = true
+			*out = append(*out, m)
+		}
+		// 嵌入类型自身也是通过嵌入获得的方法，继续向下展开。
+		p.collectEmbeddedMethods(pkg, emb, visited, taken, out)
+	}
+}
+
 // finalizeTypeParams 在全部声明解析完成后执行一遍后处理：
 // 把函数/方法签名中「直接以类型参数为类型」的 TypeRef 标记为 KindTypeParam。
 //
@@ -831,6 +917,7 @@ func (p *Parser) ParseProject(rootDir string) (*Project, error) {
 		return nil, fmt.Errorf("walk project: %w", err)
 	}
 
+	p.finalizeEmbeddedMethods()
 	p.finalizeTypeParams()
 
 	return p.project, nil
