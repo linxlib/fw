@@ -81,12 +81,15 @@ func defaultArgResolverWithHints(hints map[string]ParamHint) inject.ArgResolver 
 			source = hint.Source
 		}
 
+		// 注意: 解析结果只通过返回值交给调用方, 不写回 container.
+		// container.Set(arg.Type, ...) 会按「类型」缓存, 于是同一类型的多个形参会互相串值——
+		// 例如 List(ctx, page int, size int) 里 size 会拿到 page 的值.
+
 		if arg.Type.Kind() == reflect.Struct {
 			v := reflect.New(arg.Type).Elem()
 			if err := fillStructBySource(v, raw, source); err != nil {
 				return reflect.Value{}, false, err
 			}
-			container.Set(arg.Type, v)
 			return v, true, nil
 		}
 		if arg.Type.Kind() == reflect.Ptr && arg.Type.Elem().Kind() == reflect.Struct {
@@ -94,7 +97,6 @@ func defaultArgResolverWithHints(hints map[string]ParamHint) inject.ArgResolver 
 			if err := fillStructBySource(v.Elem(), raw, source); err != nil {
 				return reflect.Value{}, false, err
 			}
-			container.Set(arg.Type, v)
 			return v, true, nil
 		}
 
@@ -105,10 +107,17 @@ func defaultArgResolverWithHints(hints map[string]ParamHint) inject.ArgResolver 
 					return reflect.Value{}, false, err
 				}
 				if parsed.IsValid() {
-					container.Set(arg.Type, parsed)
 					return parsed, true, nil
 				}
 			}
+		}
+
+		// 查询/头部参数缺省时回退为零值: 分页接口不传 page/size 是正常用法,
+		// 应由处理器自己决定默认值, 而不是让整个调用失败.
+		// 路径参数仍然要求必须存在(路由模式已保证它能取到), 缺失说明形参名和路由占位符
+		// 不一致, 这种编写错误要保持响亮失败.
+		if source != BindPath {
+			return reflect.Zero(arg.Type), true, nil
 		}
 
 		return reflect.Value{}, false, nil

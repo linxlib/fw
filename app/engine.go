@@ -753,11 +753,19 @@ func normalizePath(p string) string {
 	return p
 }
 
+// joinPath 拼接控制器基础路径与方法注解路径.
+//
+// 指向控制器根路径的注解(如 "@GET /")收敛为不带尾斜杠的集合路径: /users + / -> /users.
+// 这样集合路由与 /users/{id} 形态一致, 也不会让客户端被尾斜杠重定向弹来弹去
+// (此前是 /users/, GET /users 会被 301 到 /users/).
 func joinPath(base, sub string) string {
 	base = normalizePath(base)
 	sub = normalizePath(sub)
 	if base == "/" {
 		return sub
+	}
+	if sub == "/" {
+		return strings.TrimSuffix(base, "/")
 	}
 	return strings.TrimSuffix(base, "/") + sub
 }

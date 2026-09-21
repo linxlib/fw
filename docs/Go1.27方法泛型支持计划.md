@@ -337,3 +337,19 @@ func MapKeys[K int | string](in []K) map[K]bool { return nil }
 端到端验证（真实起服务 + HTTP 请求）：`POST/GET/PUT/DELETE /users[/:id]`、
 `GET /users/_meta|profile|summary`、`POST /users/:id/disable` 全部符合预期；
 原有 `/api/hello/:name` 参数路由也随 `routerPath` 修复而恢复。
+
+### 落地过程中发现并修复的另外三个缺陷
+
+跑 demo 时分页接口暴露出的问题，都在 fw 运行时侧，与 astp 无关：
+
+1. **集合路由带尾斜杠**：`@GET /` + `@Route /users` 生成的是 `/users/`，
+   于是 `GET /users` 被 301 弹到 `/users/`，集合 URL 和 `/users/:id` 形态也容易混淆。
+   `joinPath` 现在把指向控制器根路径的注解收敛为不带尾斜杠的 `/users`。
+2. **缺省查询参数直接 500**：`List(ctx, page int, size int)` 不传 `page`/`size` 时
+   报 `Value not found for type int`。`defaultArgResolverWithHints` 现在对
+   非路径来源的缺省参数回退零值，由处理器自己决定默认值；路径参数缺失仍然响亮失败
+   （那说明形参名和路由占位符不一致，是编写错误）。
+3. **同类型形参串值**：解析器曾把结果 `container.Set(arg.Type, ...)` 按类型写回容器，
+   导致 `page=2&size=1` 实际拿到 `page=2, size=2`。现在解析结果只经返回值交给调用方。
+
+回归测试见 `app/param_binding_test.go`。
