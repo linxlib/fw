@@ -9,9 +9,75 @@ description: 在基于 github.com/linxlib/fw/v2 的业务应用项目中开发�
 
 核心原则一句话：**把 fw 当外部依赖，扩展业务应用，不要改框架。** 只有当用户明确要求做框架开发时，才去动框架源码，那种场景用 `fw-development` skill。
 
-权威详版文档是 `APP_AGENT.md`（仓库内）与 `doc_cn.md` / `doc_en.md`。本 skill 是可执行的步骤清单。
+本 skill 是可执行的步骤清单。**完整规范不在本文件里**，而在 fw 框架仓库的 markdown 文档中——见下一节，用之前先把它们拿到手。
 
-## 开始前：先摸清项目，别另起炉灶
+## 第 1 步：拉取权威详版文档
+
+**应用项目里没有框架文档。** 它们是 fw 框架仓库根目录下的 markdown，不在你的 `node_modules`、也不在 `go.sum` 里。本 skill 只是执行清单，遇到本文件没写清的规范，去读原文。
+
+框架仓库：
+
+- git 地址：`https://github.com/linxlib/fw`
+- 默认分支：`v2`
+- 模块路径：`github.com/linxlib/fw/v2`
+
+需要的文件（仓库根目录）：
+
+| 文件 | 内容 | 什么时候读 |
+|---|---|---|
+| `APP_AGENT.md` | 应用开发完整指南，**本 skill 的权威来源** | 动手前读一遍 |
+| `doc_cn.md` | 中文完整框架文档（注解、绑定、中间件、DI、响应、OpenAPI、配置） | 查具体规则时 |
+| `doc_en.md` | 英文完整框架文档，与 `doc_cn.md` 章节一一对应 | 同上，二选一 |
+| `doc.md` | 框架概览与快速开始 | 了解全貌 |
+| `AGENTS.md` | 框架架构与模块地图 | 需要理解框架内部时 |
+| `config/README.md` | 配置库完整说明 | 写配置、加热重载时 |
+
+四种获取方式，按当前环境选最快的：
+
+**1. 开发机上已有 fw 源码检出（最常见，优先用）**
+
+如果机器上已经 clone 了 fw 仓库，直接读那份根目录的 md，不用下载。不确定位置时：
+
+```powershell
+Get-ChildItem -Path 'E:/tmp','~/go/src/github.com/linxlib','~/code','~/projects' -Filter 'fw' -Directory -ErrorAction SilentlyContinue
+```
+
+**2. 读 Go 模块缓存（零网络，版本精确）**
+
+依赖已经 download 过时，文档就在缓存里，按版本号分子目录：
+
+```powershell
+$gp = go env GOPATH
+Get-ChildItem "$gp/pkg/mod/github.com/linxlib/fw" -Directory | Select-Object Name
+# 取对应版本目录，例如 v2@v2.0.1/APP_AGENT.md
+```
+
+**3. 浅克隆（要检索多个文件时）**
+
+```powershell
+git clone --depth 1 -b v2 https://github.com/linxlib/fw $env:TEMP/fw-docs
+```
+
+**4. 只取单个 raw 文件（最轻量）**
+
+```powershell
+$base = "https://raw.githubusercontent.com/linxlib/fw/v2"
+Invoke-WebRequest "$base/APP_AGENT.md" -OutFile "$env:TEMP/APP_AGENT.md"
+```
+
+### 版本必须对齐
+
+文档和代码同一个 tag。先看应用依赖的版本，再取同版本文档，否则文档描述的行为可能和实际依赖不一致：
+
+```powershell
+Select-String -Path go.mod -Pattern 'linxlib/fw'
+```
+
+取到 `v2.x.y` 就把上面的 `v2` 换成 `v2.x.y`；用模块缓存或本地检出时，同样优先选匹配版本的目录。
+
+如果拿不到网络也没有本地副本，**明确告诉用户"无法核对权威文档，以下按 skill 内的清单执行"**，不要凭空推断框架行为。
+
+## 第 2 步：先摸清项目，别另起炉灶
 
 1. 确认项目已有的目录结构。标准布局是 `controllers/` `services/` `middlewares/` `models/` `config/` `main.go`
 2. **如果项目已经是另一套清晰的结构，遵循现有结构**，不要强行改成标准布局

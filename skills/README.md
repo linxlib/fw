@@ -35,3 +35,20 @@ skill 是**执行清单**，不是文档副本。权威详版文档仍然是仓�
 - `DOCS_AGENT.md` — 文档维护规则
 
 skill 只负责回答"现在该读哪一份、以及哪些事不做就算没做完"。规则变更时先改上述文档，再同步 skill。
+
+## 文档不在手边时怎么办
+
+两个 skill 都只是**执行清单**，完整规范在 fw 框架仓库的 markdown 里，**不在应用项目内**：
+
+| 文件 | 内容 |
+|---|---|
+| `APP_AGENT.md` | 应用开发完整指南（`fw-app-development` 的权威来源） |
+| `doc_cn.md` / `doc_en.md` | 中/英文完整框架文档 |
+| `doc.md` | 框架概览 |
+| `AGENTS.md` | 框架架构与模块地图 |
+| `DOCS_AGENT.md` | 文档维护规则（`fw-development` 的权威来源之一） |
+| `config/README.md` | 配置库完整说明 |
+
+仓库地址 `https://github.com/linxlib/fw`，默认分支 `v2`。四种获取方式（本地检出 / Go 模块缓存 / 浅克隆 / raw 单文件）与版本对齐方法见 `fw-app-development/SKILL.md` 的「第 1 步：拉取权威详版文档」。
+
+**文档和代码同一个 tag**，先看 `go.mod` 里 `github.com/linxlib/fw/v2` 的版本号，再取同版本文档，避免文档描述与实际依赖不一致。

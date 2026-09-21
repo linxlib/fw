@@ -7,6 +7,8 @@ description: 修改 github.com/linxlib/fw 框架源码本身时必须遵守的�
 
 本 skill 是 **fw 框架仓库**开发的强制执行清单。业务应用项目的开发规范见 **`fw-app-development`** skill。仓库里的 `AGENTS.md`、`APP_AGENT.md`、`DOCS_AGENT.md` 是权威详版文档，本 skill 负责告诉你**什么时候该读哪一份、以及哪些事不做就算没做完**。
 
+如果你当前不在 fw 仓库内（skill 被加载到别的目录），先把仓库取下来：`git clone --depth 1 -b v2 https://github.com/linxlib/fw`，或读 Go 模块缓存 `$(go env GOPATH)/pkg/mod/github.com/linxlib/fw/v2@<版本>/`。上述 md 都在仓库根目录。
+
 ## 第 0 步：先判断你在改什么
 
 这一步决定后面所有规则，不要跳过。
