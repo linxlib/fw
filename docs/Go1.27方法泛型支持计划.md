@@ -352,4 +352,10 @@ func MapKeys[K int | string](in []K) map[K]bool { return nil }
 3. **同类型形参串值**：解析器曾把结果 `container.Set(arg.Type, ...)` 按类型写回容器，
    导致 `page=2&size=1` 实际拿到 `page=2, size=2`。现在解析结果只经返回值交给调用方。
 
-回归测试见 `app/param_binding_test.go`。
+4. **同一中间件跨层重复执行**：`middleware.Chain` 曾把 global/controller/method 三层直接拼接，
+   没有跨层去重。demo 里 `LogMiddleware` 既被 `e.Use()` 注册为全局、`UserController` 上又标了
+   `@Log`，于是一个请求的 `-->`/`<--` 各打两条（框架自身的请求日志仍只打一条）。
+   现在 `Chain` 按中间件名跨层去重，保留最具体的那一层（方法 > 控制器 > 全局）。
+   回归测试同时锁定了「不同中间件全部保留 + 洋葱序不变」。
+
+前三个缺陷的回归测试见 `app/param_binding_test.go`；第 4 项见 `app/middleware_chain_test.go`。

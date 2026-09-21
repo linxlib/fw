@@ -142,12 +142,20 @@ type Bound struct {
 // globalBefore → controllerBefore → methodMiddleware → handler → (unwinding)
 //
 // Each middleware's Handle receives a next function that calls the next layer.
+//
+// The same middleware can be bound at several levels at once — for example a middleware
+// registered with Engine.Use() and also annotated on the controller. Executing it once
+// per level would double its side effects (duplicated log lines, doubled timings,
+// repeated auth checks), so layers are de-duplicated by middleware name, keeping the
+// most specific binding: method > controller > global.
 func Chain(handler Handler, globalMW []Bound, controllerMW []Bound, methodMW []Bound) Handler {
 	// Flatten into a single ordered slice: global → controller → method
 	all := make([]Bound, 0, len(globalMW)+len(controllerMW)+len(methodMW))
 	all = append(all, globalMW...)
 	all = append(all, controllerMW...)
 	all = append(all, methodMW...)
+
+	all = dedupeBound(all)
 
 	// Build the chain from inside out
 	h := handler
@@ -159,4 +167,32 @@ func Chain(handler Handler, globalMW []Bound, controllerMW []Bound, methodMW []B
 		}
 	}
 	return h
+}
+
+// dedupeBound 按中间件名去重, 保留最后一次出现的绑定(即最内层/最具体的那个),
+// 其余元素的相对顺序保持不变.
+func dedupeBound(in []Bound) []Bound {
+	if len(in) < 2 {
+		return in
+	}
+	last := make(map[string]int, len(in))
+	for i, b := range in {
+		last[boundName(b)] = i
+	}
+	out := make([]Bound, 0, len(in))
+	for i, b := range in {
+		if last[boundName(b)] != i {
+			continue
+		}
+		out = append(out, b)
+	}
+	return out
+}
+
+// boundName 返回绑定的中间件名, 空实现/未注册的绑定归为同一类.
+func boundName(b Bound) string {
+	if b.MW == nil {
+		return ""
+	}
+	return b.MW.Spec().Name
 }
