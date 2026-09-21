@@ -1,11 +1,11 @@
 ---
 name: fw-development
-description: 在 github.com/linxlib/fw 仓库本身或基于 fw 的 Go 应用项目中开发时必须遵守的规范与工作流。涵盖框架开发与应用开发的边界、提交信息风格、文档三件套同步义务、交付前检查清单。当任务涉及修改 fw 框架源码、在 fw 应用项目里加功能、或需要提交代码/更新文档时使用本 skill。
+description: 修改 github.com/linxlib/fw 框架源码本身时必须遵守的规范。涵盖提交信息风格、交付前 gofmt/go vet/go test 三项检查、框架行为确定性与向后兼容约束、以及 DOCS_AGENT.md 要求的文档三件套同步义务。当任务涉及改 fw 框架的 app/astp/config/inject 等包、新增或修改公开 API、或需要提交框架改动并更新文档时使用本 skill。业务应用项目开发请用 fw-app-development。
 ---
 
 # FW 开发规范
 
-本 skill 是 fw 生态开发的**强制执行清单**。仓库里的 `AGENTS.md`、`APP_AGENT.md`、`DOCS_AGENT.md` 是权威详版文档，本 skill 负责告诉你**什么时候该读哪一份、以及哪些事不做就算没做完**。
+本 skill 是 **fw 框架仓库**开发的强制执行清单。业务应用项目的开发规范见 **`fw-app-development`** skill。仓库里的 `AGENTS.md`、`APP_AGENT.md`、`DOCS_AGENT.md` 是权威详版文档，本 skill 负责告诉你**什么时候该读哪一份、以及哪些事不做就算没做完**。
 
 ## 第 0 步：先判断你在改什么
 
@@ -16,7 +16,7 @@ description: 在 github.com/linxlib/fw 仓库本身或基于 fw 的 Go 应用项
 | fw 框架仓库（含 `app/` `astp/` `config/` `inject/` 等） | `AGENTS.md` + `DOCS_AGENT.md` | 可以改框架 |
 | 业务应用项目（`import "github.com/linxlib/fw/v2"`） | `APP_AGENT.md` | **把 fw 当外部依赖，不要改框架** |
 
-如果是应用项目，只有用户明确要求做框架开发时才动框架源码；否则再丑的框架行为也应在应用层绕过。改完框架后，记得同步上面表格里的文档。
+如果是应用项目，加载 `fw-app-development` skill 并照它做。只有用户明确要求做框架开发时才动框架源码；否则再丑的框架行为也应在应用层绕过。
 
 ## 提交信息规范
 
@@ -97,38 +97,18 @@ Select-String -Path doc.md,doc_en.md,doc_cn.md -Pattern '过期的关键词'
 (Get-Content doc_cn.md | Where-Object { $_ -match '^\s*```' }).Count   # 必须是偶数
 ```
 
-## 应用开发速查
+## 什么时候该换 skill
 
-分层决策（有疑问时按这个来）：
-
-- `controllers/` — HTTP 入口与路由注解
-- `services/` — 业务规则，标 `@Service`
-- `middlewares/` — 横切行为，**不要放业务逻辑**
-- `models/` — 请求/响应结构
-- `config/app.yaml` — 环境相关行为
-
-注解要点：
-
-- 路由：`@GET` `@POST` `@PUT` `@DELETE` `@PATCH` `@OPTIONS` `@HEAD`，控制器基路径用 `@Route /base`
-- 同一方法可写多条同方法注解，只要 URL 不同
-- 模型命名帮助推断绑定来源：`XxxBody` / `XxxQuery` / `XxxPath` / `XxxHeader`，必要时用 `@Body` `@Query` 显式指定
-- 模型字段加 `example:"..."` 与 `default:"..."`，OpenAPI 才有真实示例值
-- 泛型基类：`type UserController struct { BaseController[models.User] }`，方法提升后 schema 按实参展开
-
-**加了带注解的类型后必须重新生成元数据**，否则 `go run .` 用的是旧 `.astp.json`：
-
-```powershell
-fw build      # 或至少 go generate ./...
-go test ./...
-```
-
-需要配置热重载时，在 `app.New` 之后、`ListenAndServe` 之前调用 `e.EnableConfigReload(time.Second)`。注意它只更新内存配置，**不会重建路由表、不会切换监听端口**。
+| 任务性质 | 用哪个 |
+|---|---|
+| 改框架源码、公开 API、文档三件套、提交框架改动 | 本 skill |
+| 在业务应用项目里加接口、改业务逻辑、加中间件、写配置 | `fw-app-development` |
 
 ## 常见陷阱
 
 - 改完框架忘改文档 → 交付不完整
 - 提交信息写英文流水账 → 不符合仓库风格
-- 把业务逻辑塞进中间件或控制器
 - 只改 `doc_en.md` 不改 `doc_cn.md`
-- 在应用项目里顺手改框架
-- 假设路径参数一定能绑上：路由声明了但处理方法没写形参（或反过来）会直接报错，不会静默给空值
+- 文档示例写了当前代码里不存在的 API
+- 删了特性却留着文档章节，留下自相矛盾的说明
+- 框架行为改成"视情况而定"，破坏了确定性
