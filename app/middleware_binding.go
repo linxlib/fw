@@ -10,10 +10,10 @@ import (
 )
 
 func (e *Engine) matchMiddleware(doc *astp.CommentGroup, scope middleware.Scope) []middleware.Bound {
-	anns := annotation.FromDoc(doc)
+	annotations := annotation.FromDoc(doc)
 	index := make(map[string]int)
 	var out []middleware.Bound
-	for _, parsed := range anns {
+	for _, parsed := range annotations {
 		name := parsed.Name
 		mw, ok := e.middlewares[name]
 		if !ok {
@@ -38,9 +38,9 @@ func (e *Engine) matchMiddleware(doc *astp.CommentGroup, scope middleware.Scope)
 // e.g. @Ignore(Authorization, Log) → {"Authorization": {}, "Log": {}}
 // Multiple @Ignore annotations are merged.
 func parseIgnoreList(doc *astp.CommentGroup) map[string]struct{} {
-	anns := annotation.FromDoc(doc)
+	annotations := annotation.FromDoc(doc)
 	out := make(map[string]struct{})
-	for _, parsed := range anns {
+	for _, parsed := range annotations {
 		if parsed.Name != "Ignore" {
 			continue
 		}

@@ -159,7 +159,7 @@ func (e *Engine) RegisterController(controller any) {
 	}
 	e.autoInjectFields(v, e.globalContainer)
 	t := v.Type()
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	e.controllers[t.Name()] = v
@@ -170,7 +170,7 @@ func (e *Engine) autoInjectFields(v reflect.Value, container inject.Injector) {
 	if !v.IsValid() {
 		return
 	}
-	for v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return
 		}
@@ -756,9 +756,9 @@ func formatRecoveryTree(frames []recoveryFrame) []string {
 }
 
 func parseHTTPRoutes(doc *astp.CommentGroup) []httpRoute {
-	anns := annotation.FromDoc(doc)
+	annotations := annotation.FromDoc(doc)
 	var routes []httpRoute
-	for _, ann := range anns {
+	for _, ann := range annotations {
 		method := strings.ToUpper(strings.TrimSpace(ann.Name))
 		if !isHTTPMethod(method) {
 			continue

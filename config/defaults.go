@@ -27,7 +27,7 @@ func (c *Config) processDefaults(config any) error {
 			}
 		}
 		inner := f
-		for inner.Kind() == reflect.Ptr {
+		for inner.Kind() == reflect.Pointer {
 			inner = inner.Elem()
 		}
 		switch inner.Kind() {
@@ -54,7 +54,7 @@ func (c *Config) processRequired(config any) error {
 }
 
 func (c *Config) checkRequired(v reflect.Value) error {
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return nil
 		}
@@ -71,7 +71,7 @@ func (c *Config) checkRequired(v reflect.Value) error {
 			return fmt.Errorf("config: field %s is required, but blank", sf.Name)
 		}
 		inner := f
-		for inner.Kind() == reflect.Ptr {
+		for inner.Kind() == reflect.Pointer {
 			inner = inner.Elem()
 		}
 		switch inner.Kind() {

@@ -81,3 +81,4 @@ cmake-build-*/
 out/
 openapi.json
 .pi
+gen.json

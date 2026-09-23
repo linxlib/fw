@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"slices"
+
 	"github.com/linxlib/fw/v2/context"
 )
 
@@ -159,8 +161,7 @@ func Chain(handler Handler, globalMW []Bound, controllerMW []Bound, methodMW []B
 
 	// Build the chain from inside out
 	h := handler
-	for i := len(all) - 1; i >= 0; i-- {
-		bound := all[i]
+	for _, bound := range slices.Backward(all) {
 		inner := h // capture
 		h = func(ctx context.Context) error {
 			return bound.MW.Handle(ctx, bound.Args, inner)

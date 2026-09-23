@@ -130,15 +130,15 @@ func TestGenericMethods(t *testing.T) {
 		}
 	})
 
-	t.Run("Wrap - 约束引用结构类型参数", func(t *testing.T) {
+	t.Run("Wrap - 约束为含 ~ 的接口字面量联合约束", func(t *testing.T) {
 		wrap := findMethod(t, stack, "Wrap")
 
 		if got := genericParamNamesOf(t, wrap); len(got) != 1 || got[0] != "U" {
 			t.Fatalf("Wrap.Generic.Params = %v, want [U]", got)
 		}
-		// ~T：保留被约束类型 T 的引用（~ 运算符本身不落库）
-		if names := constraintNames(t, wrap.Generic.Params[0]); len(names) != 1 || names[0] != "T" {
-			t.Errorf("Wrap type param constraints = %v, want [T]", names)
+		// interface{ ~int | string }：~ 运算符不落库，两条分支都记录为类型引用
+		if names := constraintNames(t, wrap.Generic.Params[0]); len(names) != 2 || names[0] != "int" || names[1] != "string" {
+			t.Errorf("Wrap type param constraints = %v, want [int string]", names)
 		}
 		if wrap.Params[0].Type.Kind != KindTypeParam {
 			t.Errorf("Wrap.Params[0].Type.Kind = %v, want %v", wrap.Params[0].Type.Kind, KindTypeParam)

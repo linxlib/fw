@@ -2,6 +2,7 @@ package astp
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -171,13 +172,7 @@ func HasAnnotation(doc *CommentGroup, name string) bool {
 	if doc == nil {
 		return false
 	}
-	// 与 GetAnnotation / GetAnnotations 保持一致, 循环变量统一用 ann 而非 a.
-	for _, ann := range doc.Annotations {
-		if ann == name {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(doc.Annotations, name)
 }
 
 func GetAnnotationValue(doc *CommentGroup, name string) string {

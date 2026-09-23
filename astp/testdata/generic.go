@@ -13,9 +13,12 @@ func (s *Stack[T]) Push[V any](v V) {}
 // @GET
 func (s *Stack[T]) Pop() T { return s.items[0] }
 
-// Wrap 的方法自身类型参数约束引用结构类型参数。
+// Wrap 的方法自身类型参数约束是接口字面量联合约束（含 ~ 运算符）。
+// 注意：Go 不允许类型形参作为约束（~T 与裸 T 均报 "cannot use a type parameter
+// as constraint"），因此这里无法写成"约束引用结构类型参数 T"，改用具体类型的
+// ~ 联合约束，同样覆盖 ~ 运算符与 InterfaceType 两条解析分支。
 // @GET
-func (s *Stack[T]) Wrap[U ~T](u U) U { return u }
+func (s *Stack[T]) Wrap[U interface{ ~int | string }](u U) U { return u }
 
 // Convert 有多个方法自身类型参数，且参数/返回值使用复合类型。
 // @GET

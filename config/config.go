@@ -141,7 +141,7 @@ func (c *Config) LoadWithKey(key string, target any) error {
 		return errors.New("config: target must not be nil")
 	}
 	rv := reflect.ValueOf(target)
-	if rv.Kind() != reflect.Ptr || !rv.CanInterface() {
+	if rv.Kind() != reflect.Pointer || !rv.CanInterface() {
 		return fmt.Errorf("config: target must be a non-nil pointer, got %T", target)
 	}
 	if rv.IsNil() {
@@ -174,7 +174,7 @@ func (c *Config) Load(target any) error {
 // 字段为指针类型且当前为 nil 时会先分配实例.
 func (c *Config) LoadByTags(target any) error {
 	rv := reflect.ValueOf(target)
-	if rv.Kind() != reflect.Ptr {
+	if rv.Kind() != reflect.Pointer {
 		return fmt.Errorf("config: LoadByTags target must be a pointer, got %T", target)
 	}
 	v := rv.Elem()
@@ -199,13 +199,13 @@ func (c *Config) LoadByTags(target any) error {
 		case "":
 			tag = sf.Name
 		}
-		if f.Kind() == reflect.Ptr {
+		if f.Kind() == reflect.Pointer {
 			if f.Type().Elem().Kind() == reflect.Struct && f.IsNil() {
 				f.Set(reflect.New(f.Type().Elem()))
 			}
 		}
 		var targetPtr any
-		if f.Kind() == reflect.Ptr {
+		if f.Kind() == reflect.Pointer {
 			targetPtr = f.Interface()
 		} else {
 			targetPtr = f.Addr().Interface()

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -92,7 +93,7 @@ func defaultArgResolverWithHints(hints map[string]ParamHint) inject.ArgResolver 
 			}
 			return v, true, nil
 		}
-		if arg.Type.Kind() == reflect.Ptr && arg.Type.Elem().Kind() == reflect.Struct {
+		if arg.Type.Kind() == reflect.Pointer && arg.Type.Elem().Kind() == reflect.Struct {
 			v := reflect.New(arg.Type.Elem())
 			if err := fillStructBySource(v.Elem(), raw, source); err != nil {
 				return reflect.Value{}, false, err
@@ -167,10 +168,8 @@ func bindNamesForField(sf reflect.StructField, source BindSource) []string {
 		if v == "" || v == "-" {
 			return
 		}
-		for _, existing := range names {
-			if existing == v {
-				return
-			}
+		if slices.Contains(names, v) {
+			return
 		}
 		names = append(names, v)
 	}
@@ -217,7 +216,7 @@ func readNamedValueBySource(raw *fasthttp.RequestCtx, name string, source BindSo
 }
 
 func parsePrimitive(input string, t reflect.Type) (reflect.Value, error) {
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		v, err := parsePrimitive(input, t.Elem())
 		if err != nil {
 			return reflect.Value{}, err

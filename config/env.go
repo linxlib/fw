@@ -20,6 +20,7 @@ func (c *Config) getENVPrefix() string {
 //  1. 显式 env tag(命中即只查它);
 //  2. 前缀派生: <ENVPrefix>_<KEYPATH大写>_<PREFIX链>_<FIELD大写> (key 的 "." 替换为 "_", ENVPrefix 为 "-" 时跳过);
 //  3. 无前缀派生: <KEYPATH大写>_<PREFIX链>_<FIELD大写>.
+//
 // 内嵌结构体带 anonymous:"true" 时, 其字段路径不包含结构体名.
 func (c *Config) candidateEnvNames(key string, sf reflect.StructField, prefixes []string) []string {
 	if env := sf.Tag.Get("env"); env != "" {
@@ -54,7 +55,7 @@ func (c *Config) processEnv(config any, key string) error {
 }
 
 func (c *Config) applyEnv(v reflect.Value, key string, prefixes []string) error {
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return nil
 		}
@@ -82,7 +83,7 @@ func (c *Config) applyEnv(v reflect.Value, key string, prefixes []string) error 
 			}
 		}
 		inner := f
-		for inner.Kind() == reflect.Ptr {
+		for inner.Kind() == reflect.Pointer {
 			inner = inner.Elem()
 		}
 		switch inner.Kind() {

@@ -175,7 +175,7 @@ func (inj *injector) resolveArg(ctx ArgContext) (reflect.Value, bool, error) {
 func (inj *injector) Apply(val any) error {
 	v := reflect.ValueOf(val)
 
-	for v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 
@@ -208,7 +208,7 @@ func (inj *injector) Provide(val any) error {
 	}
 	v := reflect.ValueOf(val)
 	t0 := v.Type()
-	for v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	t := v.Type()
