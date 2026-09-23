@@ -43,6 +43,10 @@ func (c *Config) processDefaults(config any) error {
 					}
 				}
 			}
+
+		default:
+			// reflect.Kind 的其余取值刻意不处理: default tag 只对叶子字段有意义,
+			// 且上方已按字段写入; 这里只递归下钻结构体与切片, 无需处理其他 Kind.
 		}
 	}
 	return nil
@@ -85,6 +89,10 @@ func (c *Config) checkRequired(v reflect.Value) error {
 					return err
 				}
 			}
+
+		default:
+			// reflect.Kind 的其余取值刻意不处理: required 只校验叶子字段,
+			// 这里只递归下钻结构体与切片, 无需处理其他 Kind.
 		}
 	}
 	return nil

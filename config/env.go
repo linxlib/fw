@@ -100,6 +100,11 @@ func (c *Config) applyEnv(v reflect.Value, key string, prefixes []string) error 
 					}
 				}
 			}
+
+		default:
+			// reflect.Kind 的其余取值(string/int/bool/map/chan/func/...) 刻意不处理:
+			// 标量字段已由循环上方的 setFieldFromEnv 从环境变量写入, 其余复合类型
+			// 也没有需要继续下钻的子结构体, 因此这里是空操作而非错误.
 		}
 	}
 	return nil
