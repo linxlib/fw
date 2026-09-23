@@ -57,9 +57,10 @@ func parseAnnotation(line string) *Annotation {
 	}
 
 	if strings.HasPrefix(rest, "(") {
-		close := strings.LastIndex(rest, ")")
-		if close > 0 {
-			inside := strings.TrimSpace(rest[1:close])
+		// closeIdx 而非 close: close 是内建函数名, 用作变量名会遮蔽它.
+		closeIdx := strings.LastIndex(rest, ")")
+		if closeIdx > 0 {
+			inside := strings.TrimSpace(rest[1:closeIdx])
 			parseAnnotationParams(inside, ann)
 			return ann
 		}
@@ -170,8 +171,9 @@ func HasAnnotation(doc *CommentGroup, name string) bool {
 	if doc == nil {
 		return false
 	}
-	for _, a := range doc.Annotations {
-		if a == name {
+	// 与 GetAnnotation / GetAnnotations 保持一致, 循环变量统一用 ann 而非 a.
+	for _, ann := range doc.Annotations {
+		if ann == name {
 			return true
 		}
 	}
