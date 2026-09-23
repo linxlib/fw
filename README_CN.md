@@ -30,6 +30,79 @@ go get github.com/linxlib/fw/v2
 go install github.com/linxlib/fw/v2/cmd/fw@latest
 ```
 
+**环境要求：** Go 1.27 及以上。从 **v2.1.0** 起 `go.mod` 声明 `go 1.27`，
+更早的工具链会直接拒绝构建（`go.mod requires go >= 1.27`）。需要 1.27 是为了解析
+Go 1.27 的方法泛型语法。
+
+## 从 v2.0.x 及更早版本升级
+
+v2.1.0 保持模块路径 `github.com/linxlib/fw/v2` 不变，升级只需 `go get`，无需改 import；
+但如果你直接使用了 `config` 包，则**不兼容源码**。
+
+### 必须改的代码
+
+| v2.0.1 | v2.1.0 |
+| --- | --- |
+| `config.Load(path string) (Config, error)` | `config.Load(target any) error` |
+| `config.Default()` | 已删除，改用 `app.DefaultEngineConfig()` |
+| `config.ServerConfig` / `LogConfig` / `RecoveryConfig` / `OpenAPIConfig` | 移到 `app` 包 |
+| `Config.Server` / `.Log` / `.OpenAPI` / `.Recovery` / `.ProjectDir` / `.Middlewares` | 已删除，`Config` 改为由 `config.New(&config.Option{...})` 构造的加载器 |
+| `Section` 结构体及 `GetString` / `GetInt` / `GetBool` / `GetStrings` / `GetDuration` / `Sub` / `MustGet` / `UnmarshalYAML` | `Section` 即 `map[string]any`，只剩 `Get` 与 `Has` |
+
+```go
+// v2.0.1
+cfg, err := config.Load("config/app.yaml")
+host := cfg.Server.Host
+ttl := mw.Config.GetDurationDefault("timeout", 5*time.Second)
+
+// v2.1.0
+type opt struct {
+	Server struct {
+		Host string `inject:"host" default:"\"0.0.0.0\""`
+		Port int    `inject:"port" default:"8080"`
+	} `inject:"server"`
+}
+c := config.New(&config.Option{Files: []string{"config/app.yaml"}})
+var o opt
+_ = c.LoadWithKey("server", &o) // 或 c.Load(&o) / c.LoadByTags(&o)
+
+// 中间件配置：Section 就是普通 map，取值需自行断言
+if mw.Config.Has("timeout") {
+	d, _ := time.ParseDuration(mw.Config.Get("timeout"))
+}
+```
+
+只用 `app.New("config/app.yaml")` 的话无需改代码。
+
+### `openapi` 包
+
+`RouteInfo`、`MediaType`、`Schema` 新增了字段（`ResponseExample`、`Example`、`Default`）。
+不带字段名的位置化复合字面量将无法编译，需补上字段名。
+
+### 编译通过但运行行为会变
+
+- **环境变量派生规则改变。** 旧版按 `yaml` tag 派生（`FW_LOG_FILE_PATH`、
+  `FW_RECOVERY_RETURN_STACK_TO_BODY`）；新版按 inject key + Go 字段名派生
+  （`FW_LOG_FILEPATH`、`FW_RECOVERY_RETURNSTACKTOBODY`）。`FW_SERVER_HOST`、
+  `FW_SERVER_PORT`、`FW_LOG_LEVEL`、`FW_OPENAPI_ENABLED` 不变。`FW_MIDDLEWARES_*`
+  已失效，中间件配置改为只能写在 YAML 里。
+- **配置文件缺失不再导致启动失败**，改为静默使用默认值；且只接受 `.yaml` 后缀。
+- **默认值变化：** `log.file_path` 由 `logs/fw.log` 改为 `""`，
+  `recovery.return_stack_to_body` 由 `true` 改为 `false`，
+  `openapi.title` 由 `FW API` 改为 `fw API`。
+- **同一中间件跨层绑定时只执行一次**，保留最具体的一层（method > controller > global）。
+  去重是按**名字**而非实例，因此两个不同实现共用同一名字时，较不具体的那个不再执行。
+- **集合路由去掉尾斜杠：** `@Route /users` + `@GET /` 现在映射到 `/users`。写死
+  `/users/` 的客户端会 404；`/users` 则从 301 跳转转为直接响应。
+- **重新生成 `.astp.json`**（`go generate ./...`）：若以内嵌 AST 元数据方式部署，
+  v2.0.1 生成的文件缺少泛型基类控制器的路由。
+
+### 顺带修掉的问题
+
+- 缺省 query/header 参数回退零值，不再返回 500。
+- 同类型形参不再互相串值（`?page=2&size=5`）。
+- `:name` 路径参数真正可达——v2.0.1 上它们是静默 404 的，因为 fasthttp/router 只认 `{name}`。
+
 ## 快速开始
 
 创建项目：

@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Section 是一份无 schema 的键值配置段(map[string]any), 提供大小写不敏感的取值.
@@ -23,6 +25,19 @@ import (
 //	    if m.Config.Get("api-key") == "" { ... }
 //	}
 type Section map[string]any
+
+// UnmarshalYAML 让 Section 可被 yaml.v3 直接解码, 并在解码后经 NewSection 归一化
+// key. 缺少本实现时 yaml 按 map 原样解码, key 会保留配置文件里的大小写, 导致
+// Get("api-key") 取不到 YAML 中写作 API-Key 的项. 注意 null 节点不会进入本方法
+// (yaml.v3 会提前短路), 此时 Section 保持零值 nil, 而 Get/Has 对 nil 依然安全.
+func (s *Section) UnmarshalYAML(value *yaml.Node) error {
+	var raw map[string]any
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+	*s = NewSection(raw)
+	return nil
+}
 
 // NewSection 由普通 map 构造 Section, key 统一归一化为小写去空白形式.
 // 传入 nil 时返回空 Section(非 nil), 方便调用方直接取值.

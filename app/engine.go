@@ -213,12 +213,22 @@ func (e *Engine) injectMiddlewareDependencies(mw middleware.Middleware, name str
 
 // middlewareConfig 返回某个中间件对应的配置段(按中间件名小写匹配).
 // 配置文件里没有对应段时返回空 Section, 因此中间件无需判空.
+//
+// 中间件名按小写去空白后匹配: 先精确命中, 未命中再大小写不敏感地退化匹配一次,
+// 因此 YAML 中写作 Authorization / authorization 都能取到. 段内 key 的归一化由
+// config.Section.UnmarshalYAML 保证, 见 TestMiddlewareConfigCaseInsensitive.
 func (e *Engine) middlewareConfig(name string) *config.Section {
 	key := strings.ToLower(strings.TrimSpace(name))
 	if e.cfg != nil && e.cfg.Middlewares != nil {
 		if section, ok := e.cfg.Middlewares[key]; ok {
 			cpy := section
 			return &cpy
+		}
+		for k, section := range e.cfg.Middlewares {
+			if strings.EqualFold(strings.TrimSpace(k), key) {
+				cpy := section
+				return &cpy
+			}
 		}
 	}
 	empty := config.NewSection(nil)
