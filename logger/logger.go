@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pterm/pterm"
+	"github.com/linxlib/fw/v2/internal/ansi"
 )
 
 type Logger struct {
@@ -87,13 +87,13 @@ func (l *Logger) log(level Level, tag string, format string, args ...any) {
 		styled := plain
 		switch level {
 		case DebugLevel:
-			styled = pterm.NewStyle(pterm.FgLightBlue).Sprint(plain)
+			styled = ansi.Colorize(ansi.FgLightBlue, plain)
 		case InfoLevel:
-			styled = pterm.NewStyle(pterm.FgGreen).Sprint(plain)
+			styled = ansi.Colorize(ansi.FgGreen, plain)
 		case WarnLevel:
-			styled = pterm.NewStyle(pterm.FgYellow).Sprint(plain)
+			styled = ansi.Colorize(ansi.FgYellow, plain)
 		case ErrorLevel:
-			styled = pterm.NewStyle(pterm.FgRed).Sprint(plain)
+			styled = ansi.Colorize(ansi.FgRed, plain)
 		}
 		_, _ = io.WriteString(l.consoleOut, styled)
 	}

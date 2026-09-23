@@ -18,7 +18,6 @@ Runtime dependencies:
 
 - `github.com/valyala/fasthttp`
 - `github.com/fasthttp/router`
-- `github.com/pterm/pterm`
 - `gopkg.in/yaml.v3`
 
 ## Main Features

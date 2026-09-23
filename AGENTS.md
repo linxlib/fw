@@ -9,7 +9,6 @@ This document describes the current project architecture and conventions for fut
 - Runtime stack:
   - `github.com/valyala/fasthttp`
   - `github.com/fasthttp/router`
-  - `github.com/pterm/pterm`
   - `gopkg.in/yaml.v3`
 
 ## Directory Layout

@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/linxlib/fw/v2/astp"
-	"github.com/pterm/pterm"
+	"github.com/linxlib/fw/v2/internal/ansi"
 	"github.com/spf13/cobra"
 )
 
@@ -104,7 +104,7 @@ func runBuild(opts buildOptions) error {
 
 	// Step 1: Pre-build flow
 	astpFile := filepath.Join(absDir, astp.DefaultOutputFile)
-	if err := runSpinnerStep("[1/3] Running pre-build flow", func(sp *pterm.SpinnerPrinter) error {
+	if err := runSpinnerStep("[1/3] Running pre-build flow", func(sp *ansi.Spinner) error {
 		sp.UpdateText("[1/3] Running pre-build flow (go generate ./...)")
 		preGenerateCmd := exec.Command("go", "generate", "./...")
 		preGenerateCmd.Dir = absDir
@@ -128,7 +128,7 @@ func runBuild(opts buildOptions) error {
 	}
 
 	// Step 2: Compile
-	if err := runSpinnerStep(fmt.Sprintf("[2/3] Compiling %s/%s -> %s", targetOS, targetArch, outName), func(sp *pterm.SpinnerPrinter) error {
+	if err := runSpinnerStep(fmt.Sprintf("[2/3] Compiling %s/%s -> %s", targetOS, targetArch, outName), func(sp *ansi.Spinner) error {
 		buildArgs := []string{"build", "-o", outName, "."}
 		cmd := exec.Command("go", buildArgs...)
 		cmd.Dir = absDir
@@ -149,7 +149,7 @@ func runBuild(opts buildOptions) error {
 	outPath := filepath.Join(absDir, outName)
 	var artifactInfo os.FileInfo
 	var checksum string
-	if err := runSpinnerStep("[3/3] Running post-build flow", func(sp *pterm.SpinnerPrinter) error {
+	if err := runSpinnerStep("[3/3] Running post-build flow", func(sp *ansi.Spinner) error {
 		sp.UpdateText("[3/3] Running post-build flow (artifact check)")
 		var err error
 		artifactInfo, err = os.Stat(outPath)
@@ -173,18 +173,16 @@ func runBuild(opts buildOptions) error {
 	return nil
 }
 
-func runSpinnerStep(title string, fn func(sp *pterm.SpinnerPrinter) error) error {
-	sp, err := pterm.DefaultSpinner.Start(title + " ...")
-	if err != nil {
-		return fmt.Errorf("start spinner: %w", err)
-	}
+func runSpinnerStep(title string, fn func(sp *ansi.Spinner) error) error {
+	sp := ansi.NewSpinner(os.Stdout, title+" ...")
+	sp.Start()
 
 	if err := fn(sp); err != nil {
-		sp.Fail(title + " failed")
+		sp.Stop(false, title+" failed")
 		return err
 	}
 
-	sp.Success(title + " done")
+	sp.Stop(true, title+" done")
 	return nil
 }
 

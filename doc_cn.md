@@ -18,7 +18,6 @@ github.com/linxlib/fw/v2
 
 - `github.com/valyala/fasthttp`
 - `github.com/fasthttp/router`
-- `github.com/pterm/pterm`
 - `gopkg.in/yaml.v3`
 
 ## 主要特性

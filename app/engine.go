@@ -19,11 +19,11 @@ import (
 	"github.com/linxlib/fw/v2/config"
 	ctxpkg "github.com/linxlib/fw/v2/context"
 	"github.com/linxlib/fw/v2/inject"
+	"github.com/linxlib/fw/v2/internal/ansi"
 	"github.com/linxlib/fw/v2/logger"
 	"github.com/linxlib/fw/v2/middleware"
 	"github.com/linxlib/fw/v2/openapi"
 	"github.com/linxlib/fw/v2/response"
-	"github.com/pterm/pterm"
 	"github.com/valyala/fasthttp"
 )
 
@@ -646,15 +646,15 @@ func routeMiddlewareNames(rt routeDef) []string {
 func colorizeHTTPMethod(method string) string {
 	switch method {
 	case fasthttp.MethodGet:
-		return pterm.FgGreen.Sprintf("%s", method)
+		return ansi.Colorize(ansi.FgGreen, method)
 	case fasthttp.MethodPost:
-		return pterm.FgLightCyan.Sprintf("%s", method)
+		return ansi.Colorize(ansi.FgLightCyan, method)
 	case fasthttp.MethodPut:
-		return pterm.FgYellow.Sprintf("%s", method)
+		return ansi.Colorize(ansi.FgYellow, method)
 	case fasthttp.MethodDelete:
-		return pterm.FgRed.Sprintf("%s", method)
+		return ansi.Colorize(ansi.FgRed, method)
 	case fasthttp.MethodPatch:
-		return pterm.FgLightYellow.Sprintf("%s", method)
+		return ansi.Colorize(ansi.FgLightYellow, method)
 	default:
 		return method
 	}
