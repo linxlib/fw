@@ -44,7 +44,7 @@ type Option struct {
 	AutoReloadInterval time.Duration
 	// AutoReloadCallback 在某个 key 对应的内存配置被更新后, 针对每个受影响的
 	// (key, target) 调用一次; key 只会是本次实际发生变化的顶层 section.
-	AutoReloadCallback func(key string, config interface{})
+	AutoReloadCallback func(key string, config any)
 	// FS 可选的文件系统, 便于 embed.FS / 测试场景, 缺省使用 os.
 	FS fs.FS
 }

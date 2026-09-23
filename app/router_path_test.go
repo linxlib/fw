@@ -47,8 +47,9 @@ func TestPathParamRouteDispatch(t *testing.T) {
 	}
 
 	newEngine := func() *Engine {
+		cfg := DefaultEngineConfig()
 		return &Engine{
-			cfg:             ptrEngineConfig(DefaultEngineConfig()),
+			cfg:             &cfg,
 			log:             logg,
 			router:          router.New(),
 			globalContainer: inject.New(),

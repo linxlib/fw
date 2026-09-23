@@ -113,8 +113,9 @@ func newResponseTestEngine(t *testing.T, handler reflect.Value, method *astp.Fun
 		t.Fatalf("create logger: %v", err)
 	}
 
+	cfg := DefaultEngineConfig()
 	e := &Engine{
-		cfg:             ptrEngineConfig(DefaultEngineConfig()),
+		cfg:             &cfg,
 		log:             logg,
 		router:          router.New(),
 		globalContainer: inject.New(),

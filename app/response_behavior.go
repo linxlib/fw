@@ -41,7 +41,7 @@ func extractMethodResponse(results []reflect.Value) (any, error) {
 	return data, nil
 }
 
-var errorType = reflect.TypeOf((*error)(nil)).Elem()
+var errorType = reflect.TypeFor[error]()
 
 func responseWritten(raw *fasthttp.RequestCtx) bool {
 	if raw == nil {

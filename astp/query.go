@@ -71,12 +71,12 @@ func (q *Query) FindImplementations(interfaceName string) []*Type {
 	return results
 }
 
-func (q *Query) FindByAnnotation(annotation string) []interface{} {
+func (q *Query) FindByAnnotation(annotation string) []any {
 	if q.project == nil {
 		return nil
 	}
 
-	var results []interface{}
+	var results []any
 
 	for _, pkg := range q.project.Packages {
 		for _, t := range pkg.Types {

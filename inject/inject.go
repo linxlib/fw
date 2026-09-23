@@ -21,7 +21,7 @@ type Injector interface {
 	GetParent() Injector
 }
 type Provider interface {
-	Provide(interface{}) error
+	Provide(any) error
 }
 
 // Applicator represents an interface for mapping dependencies to a struct.
@@ -29,17 +29,17 @@ type Applicator interface {
 	// Apply Maps dependencies in the Type map to each field in the struct
 	// that is tagged with 'inject'. Returns an error if the injection
 	// fails.
-	Apply(interface{}) error
+	Apply(any) error
 }
 
 // Invoker represents an interface for calling functions via reflection.
 type Invoker interface {
-	// Invoke attempts to call the interface{} provided as a function,
+	// Invoke attempts to call the any provided as a function,
 	// providing dependencies for function arguments based on Type. Returns
 	// a slice of reflect.Value representing the returned values of the function.
 	// Returns an error if the injection fails.
-	Invoke(interface{}) ([]reflect.Value, error)
-	InvokeWith(interface{}, []string, any) ([]reflect.Value, error)
+	Invoke(any) ([]reflect.Value, error)
+	InvokeWith(any, []string, any) ([]reflect.Value, error)
 }
 
 type ArgContext struct {
@@ -55,14 +55,14 @@ type ResolverRegistry interface {
 	RegisterResolver(ArgResolver)
 }
 
-// TypeMapper represents an interface for mapping interface{} values based on type.
+// TypeMapper represents an interface for mapping any values based on type.
 type TypeMapper interface {
-	// Map Maps the interface{} value based on its immediate type from reflect.TypeOf.
-	Map(...interface{}) TypeMapper
-	// MapTo Maps the interface{} value based on the pointer of an Interface provided.
+	// Map Maps the any value based on its immediate type from reflect.TypeOf.
+	Map(...any) TypeMapper
+	// MapTo Maps the any value based on the pointer of an Interface provided.
 	// This is really only useful for mapping a value as an interface, as interfaces
 	// cannot at this time be referenced directly without a pointer.
-	MapTo(interface{}, interface{}) TypeMapper
+	MapTo(any, any) TypeMapper
 	// Set Provides a possibility to directly insert a mapping based on type and value.
 	// This makes it possible to directly map type arguments not possible to instantiate
 	// with reflect like unidirectional channels.
@@ -81,10 +81,10 @@ type injector struct {
 
 // InterfaceOf dereferences a pointer to an Interface type.
 // It panics if value is not a pointer to an interface.
-func InterfaceOf(value interface{}) reflect.Type {
+func InterfaceOf(value any) reflect.Type {
 	t := reflect.TypeOf(value)
 
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 
@@ -105,16 +105,16 @@ func (inj *injector) GetParent() Injector {
 	return inj.parent
 }
 
-// Invoke attempts to call the interface{} provided as a function,
+// Invoke attempts to call the any provided as a function,
 // providing dependencies for function arguments based on Type.
 // Returns a slice of reflect.Value representing the returned values of the function.
 // Returns an error if the injection fails.
 // It panics if f is not a function
-func (inj *injector) Invoke(f interface{}) ([]reflect.Value, error) {
+func (inj *injector) Invoke(f any) ([]reflect.Value, error) {
 	return inj.InvokeWith(f, nil, nil)
 }
 
-func (inj *injector) InvokeWith(f interface{}, names []string, source any) ([]reflect.Value, error) {
+func (inj *injector) InvokeWith(f any, names []string, source any) ([]reflect.Value, error) {
 	t := reflect.TypeOf(f)
 	if t == nil || t.Kind() != reflect.Func {
 		panic("inject: Invoke called with non-function")
@@ -172,7 +172,7 @@ func (inj *injector) resolveArg(ctx ArgContext) (reflect.Value, bool, error) {
 // Apply dependencies in the Type map to each field in the struct
 // that is tagged with 'inject'.
 // Returns an error if the injection fails.
-func (inj *injector) Apply(val interface{}) error {
+func (inj *injector) Apply(val any) error {
 	v := reflect.ValueOf(val)
 
 	for v.Kind() == reflect.Ptr {
@@ -255,14 +255,14 @@ func (inj *injector) Value(t reflect.Type) reflect.Value {
 
 // Maps the concrete value of val to its dynamic type using reflect.TypeOf,
 // It returns the TypeMapper registered in.
-func (inj *injector) Map(val ...interface{}) TypeMapper {
+func (inj *injector) Map(val ...any) TypeMapper {
 	for _, val := range val {
 		inj.values[reflect.TypeOf(val)] = reflect.ValueOf(val)
 	}
 	return inj
 }
 
-func (inj *injector) MapTo(val interface{}, ifacePtr interface{}) TypeMapper {
+func (inj *injector) MapTo(val any, ifacePtr any) TypeMapper {
 	inj.values[InterfaceOf(ifacePtr)] = reflect.ValueOf(val)
 	return inj
 }
@@ -276,8 +276,8 @@ func Provide[T any](this Injector) T {
 	return *a
 }
 
-// Maps the given reflect.Type to the given reflect.Value and returns
-// the Typemapper the mapping has been registered in.
+// Set Maps the given reflect.Type to the given reflect.Value and returns
+// the TypeMapper the mapping has been registered in.
 func (inj *injector) Set(typ reflect.Type, val reflect.Value) TypeMapper {
 	inj.values[typ] = val
 	return inj

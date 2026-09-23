@@ -5,27 +5,28 @@ import "sync"
 type AutoRegistrar func(*Engine) error
 
 var (
-	autoRegistrarMu sync.RWMutex
-	autoRegistrars  []AutoRegistrar
+	// autoRegistrarsMu 守护 autoRegistrars, 命名与所保护的变量保持一致.
+	autoRegistrarsMu sync.RWMutex
+	autoRegistrars   []AutoRegistrar
 )
 
 func RegisterAutoRegistrar(reg AutoRegistrar) {
 	if reg == nil {
 		return
 	}
-	autoRegistrarMu.Lock()
+	autoRegistrarsMu.Lock()
 	autoRegistrars = append(autoRegistrars, reg)
-	autoRegistrarMu.Unlock()
+	autoRegistrarsMu.Unlock()
 }
 
 func (e *Engine) applyAutoRegistrars() error {
 	if e.autoRegistered {
 		return nil
 	}
-	autoRegistrarMu.RLock()
+	autoRegistrarsMu.RLock()
 	list := make([]AutoRegistrar, len(autoRegistrars))
 	copy(list, autoRegistrars)
-	autoRegistrarMu.RUnlock()
+	autoRegistrarsMu.RUnlock()
 	for _, reg := range list {
 		if reg == nil {
 			continue

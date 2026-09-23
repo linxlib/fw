@@ -131,7 +131,7 @@ func newRecoveryTestEngine(t *testing.T, returnStack bool) *Engine {
 	cfg.Recovery.ReturnStackToBody = returnStack
 
 	e := &Engine{
-		cfg:             ptrEngineConfig(cfg),
+		cfg:             &cfg,
 		log:             logg,
 		router:          router.New(),
 		globalContainer: inject.New(),

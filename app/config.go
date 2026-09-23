@@ -55,8 +55,3 @@ func DefaultEngineConfig() EngineConfig {
 		Recovery: RecoveryConfig{Enabled: true},
 	}
 }
-
-// ptrEngineConfig 返回配置值的指针, 便于在测试里直接构造 Engine.
-func ptrEngineConfig(cfg EngineConfig) *EngineConfig {
-	return &cfg
-}

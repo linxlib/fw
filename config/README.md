@@ -28,7 +28,7 @@ func main() {
     c := config.New(&config.Option{
         AutoReload:         true,
         AutoReloadInterval: time.Second,
-        AutoReloadCallback: func(key string, cfg interface{}) {
+        AutoReloadCallback: func(key string, cfg any) {
             // 只有 key 对应的 section 被修改时才会收到回调
         },
     }) // 缺省 Files = ["config/config.yaml"], ENVPrefix = "FW"

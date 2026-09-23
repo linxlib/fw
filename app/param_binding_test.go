@@ -47,8 +47,9 @@ func newBindingTestEngine(t *testing.T) *Engine {
 	if err != nil {
 		t.Fatalf("create logger: %v", err)
 	}
+	cfg := DefaultEngineConfig()
 	return &Engine{
-		cfg:             ptrEngineConfig(DefaultEngineConfig()),
+		cfg:             &cfg,
 		log:             logg,
 		router:          router.New(),
 		globalContainer: inject.New(),

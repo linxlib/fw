@@ -44,12 +44,12 @@ type Components struct {
 }
 
 type Document struct {
-	OpenAPI    string                 `json:"openapi"`
-	Info       Info                   `json:"info"`
-	Paths      map[string]PathItem    `json:"paths"`
-	Tags       []Tag                  `json:"tags,omitempty"`
-	Components *Components            `json:"components,omitempty"`
-	Extra      map[string]interface{} `json:"-"`
+	OpenAPI    string              `json:"openapi"`
+	Info       Info                `json:"info"`
+	Paths      map[string]PathItem `json:"paths"`
+	Tags       []Tag               `json:"tags,omitempty"`
+	Components *Components         `json:"components,omitempty"`
+	Extra      map[string]any      `json:"-"`
 }
 
 type Tag struct {

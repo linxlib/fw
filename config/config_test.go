@@ -210,7 +210,7 @@ func TestIncrementalReload(t *testing.T) {
 
 	var mu sync.Mutex
 	var callbackKeys []string
-	c.AutoReloadCallback = func(key string, config interface{}) {
+	c.AutoReloadCallback = func(key string, config any) {
 		mu.Lock()
 		callbackKeys = append(callbackKeys, key)
 		mu.Unlock()
